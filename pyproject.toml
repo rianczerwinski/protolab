@@ -41,9 +41,9 @@ protolab = "protolab.cli:main"
 plab = "protolab.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/liquidprismata/protolab"
-Documentation = "https://github.com/liquidprismata/protolab/tree/main/docs"
-Issues = "https://github.com/liquidprismata/protolab/issues"
+Homepage = "https://github.com/rianczerwinski/protolab"
+Documentation = "https://github.com/rianczerwinski/protolab/tree/main/docs"
+Issues = "https://github.com/rianczerwinski/protolab/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/protolab"]
