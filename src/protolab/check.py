@@ -1,12 +1,20 @@
-"""protolab check — evaluate resynthesis triggers."""
+"""protolab check — evaluate resynthesis triggers.
+
+Pure computation: no I/O, no side effects. Takes config, corrections,
+and rules; returns a list of trigger results.
+"""
 
 from __future__ import annotations
 
+import logging
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from .config import Config
+from .types import Correction, Rule
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -21,8 +29,8 @@ class TriggerResult:
 
 def evaluate_triggers(
     config: Config,
-    corrections: list[dict],
-    rules: list[dict],
+    corrections: list[Correction],
+    rules: list[Rule],
 ) -> list[TriggerResult]:
     """Evaluate all configured triggers. Return results."""
     results: list[TriggerResult] = []
@@ -36,7 +44,7 @@ def evaluate_triggers(
         threshold=config.triggers.total_corrections,
     ))
 
-    # 2. Cluster threshold
+    # 2. Cluster threshold — what fraction of corrections hit the same step?
     if total > 0:
         valid = [c for c in corrections if "step" in c]
         step_counts = Counter(c["step"] for c in valid)
@@ -51,18 +59,18 @@ def evaluate_triggers(
         threshold=config.triggers.cluster_threshold,
     ))
 
-    # 3. Preventable errors
+    # 3. Preventable errors — corrections on steps that already have rules
     preventable = 0
     for corr in corrections:
         if "step" not in corr or "date" not in corr:
             continue
         for rule in rules:
-            if ("decision_point" not in rule or "date_added" not in rule):
+            if "decision_point" not in rule or "date_added" not in rule:
                 continue
             if (rule["decision_point"] == corr["step"]
                     and rule["date_added"] <= corr["date"]):
                 preventable += 1
-                break
+                break  # one matching rule is enough — avoid double-counting
     results.append(TriggerResult(
         name="preventable_errors",
         met=preventable >= config.triggers.preventable_errors,
@@ -73,7 +81,7 @@ def evaluate_triggers(
     # 4. Days since last resynthesis
     if config.triggers.max_days_since_resynthesis is not None:
         if config.last_resynthesis_date is None:
-            # No previous resynthesis — don't trigger
+            # No previous resynthesis — trigger is not applicable
             results.append(TriggerResult(
                 name="max_days_since_resynthesis",
                 met=False,
@@ -88,5 +96,10 @@ def evaluate_triggers(
                 current_value=days,
                 threshold=config.triggers.max_days_since_resynthesis,
             ))
+
+    for r in results:
+        logger.debug("Trigger %s: %s (current=%s, threshold=%s)",
+                      r.name, "MET" if r.met else "unmet",
+                      r.current_value, r.threshold)
 
     return results

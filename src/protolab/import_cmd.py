@@ -1,15 +1,24 @@
-"""protolab import — import eval failures as correction stubs."""
+"""protolab import — import eval failures as correction stubs.
+
+Reads JSONL or CSV files from eval frameworks and converts rows into
+correction stubs with ``correct_output`` and ``reasoning`` set to
+``"TODO"``. The human fills in the semantic fields afterward.
+"""
 
 from __future__ import annotations
 
 import csv
 import json
+import logging
 import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import Config
 from .store import load_corrections, next_id
+from .types import Correction
+
+logger = logging.getLogger(__name__)
 
 
 def import_eval_failures(
@@ -18,11 +27,11 @@ def import_eval_failures(
     subject_field: str,
     output_field: str,
     step_field: str,
-) -> list[dict]:
-    """Read JSONL or CSV. Map fields to correction schema.
+) -> tuple[list[Correction], int]:
+    """Import eval failures as correction stubs.
 
-    Set correct_output and reasoning to 'TODO'.
-    Return list of correction stubs.
+    Returns ``(stubs, skipped)`` — the list of created stubs and the
+    count of rows that were skipped due to missing fields.
     """
     suffix = path.suffix.lower()
 
@@ -36,8 +45,11 @@ def import_eval_failures(
         )
 
     existing = load_corrections(config)
-    stubs: list[dict] = []
+    stubs: list[Correction] = []
     skipped = 0
+
+    # Each target field tries candidates in order: the user-specified name
+    # first, then common defaults. First match wins.
     field_map = {
         "subject": [subject_field, "subject", "input"],
         "protocol_output": [output_field, "output", "expected"],
@@ -79,11 +91,12 @@ def import_eval_failures(
             "reasoning": "TODO",
         })
 
+    logger.debug("Imported %d stubs, skipped %d rows from %s", len(stubs), skipped, path)
     return stubs, skipped
 
 
 def _read_jsonl(path: Path) -> list[dict]:
-    """Read JSONL file, one JSON object per line."""
+    """Read a JSONL file — one JSON object per line."""
     rows: list[dict] = []
     with open(path) as f:
         for line in f:
@@ -94,7 +107,7 @@ def _read_jsonl(path: Path) -> list[dict]:
 
 
 def _read_csv(path: Path) -> list[dict]:
-    """Read CSV file with header row."""
+    """Read a CSV file with a header row."""
     with open(path, newline="") as f:
         reader = csv.DictReader(f)
         return list(reader)

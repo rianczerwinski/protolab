@@ -1,7 +1,13 @@
-"""Click CLI group and all commands."""
+"""Click CLI group and all commands.
+
+The ``--verbose`` flag on the group configures Python logging. Library
+modules use ``logging.getLogger(__name__)`` — output is silent by default
+and enabled with ``protolab -v <command>``.
+"""
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
@@ -24,7 +30,12 @@ console = Console()
 
 
 def _version_increment(version: str) -> str:
-    """Auto-increment version: v1.0 -> v1.1, v2.3.1 -> v2.3.2."""
+    """Auto-increment a dotted version string.
+
+    Splits on ``"."``, increments the last numeric segment.
+    ``"v1.0"`` -> ``"v1.1"``, ``"v2.3.1"`` -> ``"v2.3.2"``.
+    Returns the input unchanged if the last segment is non-numeric.
+    """
     parts = version.split(".")
     try:
         parts[-1] = str(int(parts[-1]) + 1)
@@ -34,8 +45,11 @@ def _version_increment(version: str) -> str:
 
 
 @click.group()
-def main():
+@click.option("-v", "--verbose", is_flag=True, help="Enable debug logging")
+def main(verbose):
     """Protolab: error-driven compression for protocol documents."""
+    level = logging.DEBUG if verbose else logging.WARNING
+    logging.basicConfig(level=level, format="%(name)s: %(message)s")
 
 
 @main.command()

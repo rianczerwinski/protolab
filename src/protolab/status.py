@@ -1,7 +1,12 @@
-"""protolab status — rich dashboard."""
+"""protolab status — rich dashboard.
+
+Loads all project data and renders a formatted overview to the terminal
+using rich panels and tables.
+"""
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime
 
@@ -13,10 +18,13 @@ from .analyze import analyze_corrections
 from .check import evaluate_triggers
 from .config import Config
 from .store import load_corrections, load_rules
+from .types import CONFIDENCE_LEVELS
+
+logger = logging.getLogger(__name__)
 
 
 def render_status(config: Config, console: Console | None = None) -> None:
-    """Load all data and render rich-formatted dashboard to terminal."""
+    """Load all data and render a rich-formatted dashboard to the terminal."""
     if console is None:
         console = Console()
 
@@ -65,7 +73,7 @@ def render_status(config: Config, console: Console | None = None) -> None:
 
     # Rules by confidence
     if rules:
-        counts = {"provisional": 0, "strong_pattern": 0, "structural": 0}
+        counts = {level: 0 for level in CONFIDENCE_LEVELS}
         for r in rules:
             conf = r.get("confidence", "provisional")
             if conf in counts:

@@ -1,9 +1,18 @@
-"""protolab analyze — cluster analysis of accumulated corrections."""
+"""protolab analyze — cluster analysis of accumulated corrections.
+
+Pure computation: no I/O, no AI. Groups corrections by decision point,
+computes concentration ratios, and identifies preventable errors.
+"""
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
+
+from .types import Correction, Rule
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -13,8 +22,8 @@ class StepCluster:
     step: str
     count: int
     percentage: float
-    corrections: list[dict]
-    rules: list[dict]
+    corrections: list[Correction]
+    rules: list[Rule]
     preventable_count: int
 
 
@@ -25,12 +34,12 @@ class AnalysisResult:
     total_corrections: int
     unique_steps: int
     clusters: list[StepCluster]  # sorted by count desc
-    concentration_ratio: float  # top cluster / total
+    concentration_ratio: float  # top_cluster_count / total, range [0, 1]
 
 
 def analyze_corrections(
-    corrections: list[dict],
-    rules: list[dict],
+    corrections: list[Correction],
+    rules: list[Rule],
 ) -> AnalysisResult:
     """Cluster corrections by step, compute diagnostics."""
     total = len(corrections)
@@ -44,7 +53,7 @@ def analyze_corrections(
         )
 
     # Group corrections by step, skip malformed entries
-    by_step: dict[str, list[dict]] = defaultdict(list)
+    by_step: dict[str, list[Correction]] = defaultdict(list)
     for corr in corrections:
         if "step" not in corr:
             continue
@@ -58,7 +67,9 @@ def analyze_corrections(
             if r.get("decision_point") == step
         ]
 
-        # Count preventable: corrections after any matching rule was added
+        # Count preventable: corrections that occurred after a matching rule
+        # was established. One matching rule is enough — break avoids
+        # double-counting when multiple rules cover the same step.
         preventable = 0
         for corr in step_corrections:
             if "date" not in corr:
@@ -79,8 +90,12 @@ def analyze_corrections(
             preventable_count=preventable,
         ))
 
-    # Sort by count descending
     clusters.sort(key=lambda c: c.count, reverse=True)
+
+    logger.debug(
+        "Analysis: %d corrections, %d steps, top cluster '%s' (%d)",
+        total, len(clusters), clusters[0].step, clusters[0].count,
+    )
 
     return AnalysisResult(
         total_corrections=total,

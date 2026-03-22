@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -10,17 +11,24 @@ import click
 
 from .config import Config
 from .store import load_corrections, load_rules, load_toml, next_id
+from .types import REQUIRED_CORRECTION_FIELDS, Correction, Rule
+
+logger = logging.getLogger(__name__)
 
 
-def interactive_correct(config: Config) -> dict:
-    """Prompt user for correction fields. Return correction dict."""
+def interactive_correct(config: Config) -> Correction:
+    """Prompt the user for each correction field interactively.
+
+    Auto-generates ``id``, ``date``, and ``protocol_version``. Returns
+    the completed correction dict (not yet persisted — caller saves).
+    """
     existing = load_corrections(config)
     corr_id = next_id(existing, "corr")
 
     subject = click.prompt("Subject (what was being analyzed)")
 
-    # Step with completion from registry and history
-    used_steps = sorted({c["step"] for c in existing})
+    # Step with completion hints from registry and history
+    used_steps = sorted({c["step"] for c in existing if "step" in c})
     if config.steps:
         step_hint = f" [{', '.join(config.steps)}]"
     elif used_steps:
@@ -33,7 +41,7 @@ def interactive_correct(config: Config) -> dict:
     correct_output = click.prompt("What was actually correct")
     reasoning = click.prompt("Why the correction is right")
 
-    correction: dict = {
+    correction: Correction = {
         "id": corr_id,
         "subject": subject,
         "date": datetime.now(timezone.utc),
@@ -51,8 +59,13 @@ def interactive_correct(config: Config) -> dict:
     return correction
 
 
-def batch_correct(config: Config, path: Path) -> list[dict]:
-    """Load corrections from JSON or TOML file. Validate. Return list."""
+def batch_correct(config: Config, path: Path) -> list[Correction]:
+    """Load corrections from a JSON or TOML file, validate, and return.
+
+    Auto-populates ``id``, ``date``, and ``protocol_version`` for each
+    correction. String dates from JSON are parsed to datetime objects —
+    JSON has no native datetime type, so ISO 8601 strings are expected.
+    """
     existing = load_corrections(config)
     suffix = path.suffix.lower()
 
@@ -67,16 +80,17 @@ def batch_correct(config: Config, path: Path) -> list[dict]:
     else:
         raise ValueError(f"Unsupported batch format '{suffix}'. Use .json or .toml.")
 
-    required_fields = {"subject", "step", "protocol_output", "correct_output", "reasoning"}
-    corrections: list[dict] = []
+    corrections: list[Correction] = []
     for i, item in enumerate(raw):
-        missing = required_fields - set(item.keys())
+        missing = REQUIRED_CORRECTION_FIELDS - set(item.keys())
         if missing:
             raise ValueError(
                 f"Correction at index {i} is missing required field(s): "
                 f"{', '.join(sorted(missing))}"
             )
         corr_id = next_id(existing + corrections, "corr")
+
+        # JSON has no datetime type — coerce ISO 8601 strings to datetime
         date_val = item.get("date", datetime.now(timezone.utc))
         if isinstance(date_val, str):
             try:
@@ -86,7 +100,8 @@ def batch_correct(config: Config, path: Path) -> list[dict]:
                     f"Correction at index {i} has invalid date format: '{date_val}'. "
                     f"Use ISO 8601 (e.g. 2026-03-22T14:30:00Z)."
                 )
-        correction: dict = {
+
+        correction: Correction = {
             "id": corr_id,
             "subject": item["subject"],
             "date": date_val,
@@ -100,16 +115,22 @@ def batch_correct(config: Config, path: Path) -> list[dict]:
             correction["rule"] = item["rule"]
         corrections.append(correction)
 
+    logger.debug("Batch loaded %d correction(s) from %s", len(corrections), path)
     return corrections
 
 
-def extract_rule(correction: dict, config: Config) -> dict | None:
-    """If correction has rule text, create rule dict with provisional confidence."""
+def extract_rule(correction: Correction, config: Config) -> Rule | None:
+    """If the correction contains rule text, create a provisional rule dict.
+
+    Returns ``None`` if the correction has no ``rule`` field.
+    """
     if "rule" not in correction:
         return None
 
     existing_rules = load_rules(config)
     rule_id = next_id(existing_rules, "rule")
+
+    logger.debug("Extracted rule %s from correction %s", rule_id, correction["id"])
 
     return {
         "id": rule_id,

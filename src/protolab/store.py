@@ -1,7 +1,13 @@
-"""TOML read/write for corrections and rules."""
+"""TOML read/write for corrections and rules.
+
+All file I/O for correction logs and rule files is routed through this
+module. Callers never open TOML files directly — this keeps the storage
+format isolated and swappable.
+"""
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
@@ -13,17 +19,27 @@ else:
 import tomli_w
 
 from .config import Config
+from .types import Correction, Rule
+
+logger = logging.getLogger(__name__)
+
+ID_PAD_WIDTH = 3  # zero-pad width for generated IDs (corr_001, rule_042)
 
 
 def load_toml(path: Path) -> dict:
-    """Load TOML file. Return dict (may be empty if file has no arrays)."""
+    """Load a TOML file and return its contents as a dict.
+
+    Empty files (0 bytes) return ``{}``. Non-empty files that fail to parse
+    raise ``ValueError`` with the file path for diagnostics.
+    """
     try:
         with open(path, "rb") as f:
-            return tomllib.load(f)
+            data = tomllib.load(f)
+        logger.debug("Loaded %s (%d top-level keys)", path, len(data))
+        return data
     except tomllib.TOMLDecodeError:
-        # Empty files (0 bytes) are expected — return empty dict.
-        # Non-empty files that fail to parse are real errors.
         if path.stat().st_size == 0:
+            logger.debug("Empty file %s — returning {}", path)
             return {}
         raise ValueError(
             f"Failed to parse TOML file '{path}'. "
@@ -32,13 +48,14 @@ def load_toml(path: Path) -> dict:
 
 
 def save_toml(path: Path, data: dict) -> None:
-    """Write TOML with clean formatting via tomli_w."""
+    """Write a dict to a TOML file, creating parent directories as needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(tomli_w.dumps(data))
+    logger.debug("Wrote %s", path)
 
 
-def load_corrections(config: Config) -> list[dict]:
-    """Load correction log. Return data.get('corrections', [])."""
+def load_corrections(config: Config) -> list[Correction]:
+    """Load the correction log. Returns ``[]`` if the file is missing or empty."""
     path = config.root / config.corrections_path
     if not path.exists():
         return []
@@ -46,14 +63,14 @@ def load_corrections(config: Config) -> list[dict]:
     return data.get("corrections", [])
 
 
-def save_corrections(config: Config, corrections: list[dict]) -> None:
-    """Write corrections as {'corrections': corrections} to TOML."""
+def save_corrections(config: Config, corrections: list[Correction]) -> None:
+    """Write the full correction list to the correction log."""
     path = config.root / config.corrections_path
     save_toml(path, {"corrections": corrections})
 
 
-def load_rules(config: Config) -> list[dict]:
-    """Load rules. Return data.get('rules', [])."""
+def load_rules(config: Config) -> list[Rule]:
+    """Load the rules file. Returns ``[]`` if the file is missing or empty."""
     path = config.root / config.rules_path
     if not path.exists():
         return []
@@ -61,17 +78,26 @@ def load_rules(config: Config) -> list[dict]:
     return data.get("rules", [])
 
 
-def save_rules(config: Config, rules: list[dict]) -> None:
-    """Write rules as {'rules': rules} to TOML."""
+def save_rules(config: Config, rules: list[Rule]) -> None:
+    """Write the full rule list to the rules file."""
     path = config.root / config.rules_path
     save_toml(path, {"rules": rules})
 
 
 def next_id(existing: list[dict], prefix: str) -> str:
-    """Generate next sequential ID: prefix_NNN."""
+    """Generate the next sequential ID (e.g. ``corr_001``, ``rule_042``).
+
+    Scans existing items for the highest numeric suffix and increments.
+    Non-numeric suffixes (e.g. manually inserted IDs) are skipped.
+    A collision check ensures the generated ID is unique even if manual
+    entries occupy the next slot.
+    """
     existing_ids = {item.get("id", "") for item in existing}
     if not existing:
-        return f"{prefix}_001"
+        candidate = f"{prefix}_{'1':0>{ID_PAD_WIDTH}}"
+        logger.debug("Generated first ID: %s", candidate)
+        return candidate
+
     max_num = 0
     for item in existing:
         item_id = item.get("id", "")
@@ -82,10 +108,14 @@ def next_id(existing: list[dict], prefix: str) -> str:
                 if num > max_num:
                     max_num = num
             except ValueError:
+                # Non-numeric suffix (e.g. manual ID) — skip
                 continue
-    # Verify no collision, increment if needed
-    candidate = f"{prefix}_{max_num + 1:03d}"
+
+    # Collision guard: if a manual entry occupies the next slot, keep incrementing
+    candidate = f"{prefix}_{max_num + 1:0{ID_PAD_WIDTH}d}"
     while candidate in existing_ids:
         max_num += 1
-        candidate = f"{prefix}_{max_num + 1:03d}"
+        candidate = f"{prefix}_{max_num + 1:0{ID_PAD_WIDTH}d}"
+
+    logger.debug("Generated ID: %s", candidate)
     return candidate

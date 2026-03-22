@@ -1,13 +1,21 @@
-"""protolab init — interactive project scaffolding."""
+"""protolab init — interactive project scaffolding.
+
+Creates the initial project structure: ``protolab.toml``, empty correction
+and rule files, and the default resynthesis prompt template.
+"""
 
 from __future__ import annotations
 
-import glob
+import glob as globmod
+import logging
 from pathlib import Path
 
 import click
 import tomli_w
 
+logger = logging.getLogger(__name__)
+
+PROTOCOL_GLOBS = ["*.md", "system-prompt.*", "prompt.*", "protocol.*"]
 
 DEFAULT_TEMPLATE = """\
 # Protocol Resynthesis
@@ -63,10 +71,11 @@ You are rewriting a protocol document. Your goal is to produce a new version tha
 
 
 def scaffold_project(bare: bool = False) -> None:
-    """Create protolab.toml, empty correction/rule files, and template directory.
+    """Create ``protolab.toml``, empty data files, and the template directory.
 
-    If bare=False, globs for likely protocol files and offers interactive selection.
-    If bare=True, uses all defaults and assumes protocol.md exists.
+    In bare mode, uses all defaults and assumes ``protocol.md`` exists
+    (warns if it doesn't). In interactive mode, globs for likely protocol
+    files and offers them as choices.
     """
     cwd = Path.cwd()
 
@@ -80,9 +89,8 @@ def scaffold_project(bare: bool = False) -> None:
     else:
         # Glob for likely protocol files
         candidates = []
-        for pattern in ["*.md", "system-prompt.*", "prompt.*", "protocol.*"]:
-            candidates.extend(glob.glob(pattern))
-        # Deduplicate and sort
+        for pattern in PROTOCOL_GLOBS:
+            candidates.extend(globmod.glob(pattern))
         candidates = sorted(set(candidates))
 
         if candidates:
@@ -119,4 +127,5 @@ def scaffold_project(bare: bool = False) -> None:
     templates_dir.mkdir(exist_ok=True)
     (templates_dir / "resynthesis-prompt.md").write_text(DEFAULT_TEMPLATE)
 
+    logger.debug("Scaffolded project in %s (protocol: %s)", cwd, protocol_path)
     click.echo("Ready. Log your first correction with `protolab correct`")
