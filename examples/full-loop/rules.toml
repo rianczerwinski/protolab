@@ -1,0 +1,4 @@
+# [TODO] 3 rules as [[rules]] entries:
+# - "When a payment failure is caused by a system/API error, classify as technical not billing" (strong_pattern)
+# - "Multi-intent messages: classify by the actionable intent, not the secondary mention" (provisional)
+# - "Emotional tone (anger, frustration) is not a classification signal" (structural)

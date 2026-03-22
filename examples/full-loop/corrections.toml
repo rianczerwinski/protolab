@@ -1,0 +1,5 @@
+# [TODO] 8 corrections as [[corrections]] entries:
+# - 3 on billing/technical overlap (failed payments caused by API errors)
+# - 2 on multi-intent messages (billing question + feature request in same message)
+# - 2 on tone misclassification (angry messages routed to billing regardless of content)
+# - 1 on genuine edge case (pricing page broken = technical, not billing)

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Protolab working files (created by `protolab init` in dev)
+corrections/
+templates/
+resynthesis/
+protocol/versions/
+
+# Spec documents (development artifacts, not shipped)
+protolab-spec.md
+protolab-architecture.md

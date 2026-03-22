@@ -1,0 +1,17 @@
+[protocol]
+path = "protocol-v1.md"
+version = "v1.0"
+
+[corrections]
+path = "corrections.toml"
+rules_path = "rules.toml"
+
+[resynthesis]
+prompt_template = "../../resynthesis-prompt-template.md"
+output_path = "resynthesis-prompt.md"
+
+[resynthesis.triggers]
+total_corrections = 8
+
+[archive]
+versions_path = "versions/"

@@ -1,0 +1,101 @@
+"""Tests for protolab.config — configuration loading and validation."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
+
+from protolab.config import Config, TriggerConfig, load_config
+
+
+def test_defaults(tmp_project):
+    """Minimal config (just protocol path) — all other fields populated with defaults."""
+    config = load_config(tmp_project / "protolab.toml")
+    assert config.root == tmp_project
+    assert config.protocol_path == Path("protocol.md")
+    assert config.protocol_version == "v1.0"
+    assert config.steps == []
+    assert config.corrections_path == Path("corrections/correction-log.toml")
+    assert config.rules_path == Path("corrections/rules.toml")
+    assert config.triggers.total_corrections == 10
+    assert config.triggers.cluster_threshold == 0.30
+    assert config.triggers.preventable_errors == 3
+    assert config.triggers.max_days_since_resynthesis == 30
+    assert config.last_resynthesis_date is None
+    assert config.llm_provider == "anthropic"
+    assert config.llm_model == "claude-sonnet-4-20250514"
+
+
+def test_full_config(tmp_project):
+    """All fields specified — all loaded correctly."""
+    (tmp_project / "protolab.toml").write_text("""\
+[protocol]
+path = "protocol.md"
+version = "v2.1"
+steps = ["classification", "severity"]
+
+[corrections]
+path = "data/corrections.toml"
+rules_path = "data/rules.toml"
+
+[resynthesis]
+prompt_template = "my-template.md"
+output_path = "out/resynthesis.md"
+last_resynthesis_date = 2026-03-01T00:00:00Z
+
+[resynthesis.triggers]
+total_corrections = 5
+cluster_threshold = 0.50
+preventable_errors = 2
+max_days_since_resynthesis = 14
+
+[archive]
+versions_path = "archive/versions/"
+
+[llm]
+provider = "anthropic"
+model = "claude-opus-4-20250514"
+api_key_env = "MY_KEY"
+""")
+    config = load_config(tmp_project / "protolab.toml")
+    assert config.protocol_version == "v2.1"
+    assert config.steps == ["classification", "severity"]
+    assert config.corrections_path == Path("data/corrections.toml")
+    assert config.rules_path == Path("data/rules.toml")
+    assert config.triggers.total_corrections == 5
+    assert config.triggers.cluster_threshold == 0.50
+    assert config.triggers.preventable_errors == 2
+    assert config.triggers.max_days_since_resynthesis == 14
+    assert config.prompt_template_path == Path("my-template.md")
+    assert config.resynthesis_output_path == Path("out/resynthesis.md")
+    assert isinstance(config.last_resynthesis_date, datetime)
+    assert config.archive_versions_path == Path("archive/versions/")
+    assert config.llm_model == "claude-opus-4-20250514"
+    assert config.llm_api_key_env == "MY_KEY"
+
+
+def test_missing_protocol(tmp_project):
+    """Protocol file doesn't exist — clear error."""
+    (tmp_project / "protolab.toml").write_text(
+        '[protocol]\npath = "nonexistent.md"\n'
+    )
+    with pytest.raises(FileNotFoundError, match="Protocol file not found"):
+        load_config(tmp_project / "protolab.toml")
+
+
+def test_invalid_toml(tmp_project):
+    """Malformed TOML — clear error."""
+    (tmp_project / "protolab.toml").write_text("this is not [valid toml\n")
+    with pytest.raises(Exception):
+        load_config(tmp_project / "protolab.toml")
+
+
+def test_path_traversal_rejected(tmp_project):
+    """Protocol path escaping project root is rejected."""
+    (tmp_project / "protolab.toml").write_text(
+        '[protocol]\npath = "../../etc/passwd"\n'
+    )
+    with pytest.raises(ValueError, match="escapes the project root"):
+        load_config(tmp_project / "protolab.toml")
