@@ -177,3 +177,14 @@ def sample_rules() -> list[dict]:
 def sample_config(tmp_project: Path) -> Config:
     """Return Config object pointed at tmp_project."""
     return load_config(tmp_project / "protolab.toml")
+
+
+@pytest.fixture
+def api_client(tmp_project: Path):
+    """Return a FastAPI TestClient pointed at a tmp_project."""
+    fastapi = pytest.importorskip("fastapi")
+    from protolab.serve import create_app
+    from starlette.testclient import TestClient
+
+    app = create_app(tmp_project / "protolab.toml")
+    return TestClient(app)

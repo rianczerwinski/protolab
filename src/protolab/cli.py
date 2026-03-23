@@ -277,3 +277,24 @@ def status():
         raise click.ClickException(str(e))
 
     render_status(config, console)
+
+
+@main.command()
+@click.option("--port", default=8080, help="Port to listen on")
+@click.option("--host", default="127.0.0.1", help="Host to bind to")
+def serve(port, host):
+    """Start the protolab HTTP server and web dashboard."""
+    try:
+        from .serve import run_server
+    except ImportError:
+        raise click.ClickException(
+            "The 'serve' extra is required. Install with: pip install protolab[serve]"
+        )
+    try:
+        config = load_config()
+    except FileNotFoundError as e:
+        raise click.ClickException(str(e))
+
+    config_path = Path.cwd() / "protolab.toml"
+    console.print(f"Starting protolab server on http://{host}:{port}")
+    run_server(config_path, host, port)
