@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime
-from typing import TypedDict
+from typing import Any, TypedDict
 
 if sys.version_info >= (3, 11):
     from typing import NotRequired
@@ -30,6 +30,7 @@ class Correction(TypedDict):
     correct_output: str
     reasoning: str
     rule: NotRequired[str]
+    metadata: NotRequired[dict[str, Any]]
 
 
 class Rule(TypedDict):

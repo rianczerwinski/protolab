@@ -35,6 +35,26 @@ class TriggerConfig:
 
 
 @dataclass
+class ImportSchema:
+    """A user-defined import adapter configuration.
+
+    Dot-path fields (``subject``, ``protocol_output``, etc.) use ``"a.b.0.c"``
+    syntax to traverse nested dicts and lists in source data. Literal strings
+    that don't match any path resolve to themselves (e.g. ``"TODO"``).
+    """
+
+    format: str  # jsonl | csv | json
+    subject: str  # dot-path into source row
+    protocol_output: str  # dot-path
+    step: str  # dot-path
+    correct_output: str = "TODO"  # dot-path or literal default
+    reasoning: str = "TODO"  # dot-path or literal default
+    filter_field: str | None = None  # simple equality filter: field name
+    filter_value: str | None = None  # simple equality filter: required value
+    metadata_fields: list[str] = field(default_factory=list)
+
+
+@dataclass
 class Config:
     """Protolab project configuration loaded from protolab.toml.
 
@@ -58,6 +78,7 @@ class Config:
     llm_provider: str = "anthropic"
     llm_model: str = DEFAULT_LLM_MODEL
     llm_api_key_env: str = "ANTHROPIC_API_KEY"
+    import_schemas: dict[str, ImportSchema] = field(default_factory=dict)
 
 
 def load_config(path: Path | None = None) -> Config:
@@ -138,11 +159,29 @@ def load_config(path: Path | None = None) -> Config:
     llm_model = llm.get("model", DEFAULT_LLM_MODEL)
     llm_api_key_env = llm.get("api_key_env", "ANTHROPIC_API_KEY")
 
+    # Import schemas — user-defined adapters ([import.<name>] sections)
+    import_schemas: dict[str, ImportSchema] = {}
+    for name, schema_data in data.get("import", {}).items():
+        if not isinstance(schema_data, dict):
+            continue
+        import_schemas[name] = ImportSchema(
+            format=schema_data.get("format", "jsonl"),
+            subject=schema_data["subject"],
+            protocol_output=schema_data["protocol_output"],
+            step=schema_data["step"],
+            correct_output=schema_data.get("correct_output", "TODO"),
+            reasoning=schema_data.get("reasoning", "TODO"),
+            filter_field=schema_data.get("filter_field"),
+            filter_value=schema_data.get("filter_value"),
+            metadata_fields=schema_data.get("metadata_fields", []),
+        )
+
     logger.debug(
-        "Protocol: %s (version %s, paths: %s)",
+        "Protocol: %s (version %s, paths: %s, import schemas: %s)",
         protocol_path,
         protocol_version,
         protocol_paths or "single-file",
+        list(import_schemas) or "none",
     )
 
     return Config(
@@ -161,6 +200,7 @@ def load_config(path: Path | None = None) -> Config:
         llm_provider=llm_provider,
         llm_model=llm_model,
         llm_api_key_env=llm_api_key_env,
+        import_schemas=import_schemas,
     )
 
 

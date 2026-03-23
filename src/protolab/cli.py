@@ -124,11 +124,18 @@ def correct(batch: str | None) -> None:
 
 @main.command("import")
 @click.argument("path", type=click.Path(exists=True))
-@click.option("--subject-field", default="subject")
-@click.option("--output-field", default="output")
-@click.option("--step-field", default="step")
+@click.option(
+    "--from",
+    "adapter_name",
+    default="auto",
+    help="Adapter: promptfoo, braintrust, auto, or a custom name from config",
+)
+@click.option("--subject-field", default="subject", help="Legacy: subject field name")
+@click.option("--output-field", default="output", help="Legacy: output field name")
+@click.option("--step-field", default="step", help="Legacy: step field name")
 def import_cmd(
     path: str,
+    adapter_name: str,
     subject_field: str,
     output_field: str,
     step_field: str,
@@ -139,13 +146,18 @@ def import_cmd(
     except FileNotFoundError as e:
         raise click.ClickException(str(e))
 
-    stubs, skipped = import_eval_failures(
-        config,
-        Path(path),
-        subject_field,
-        output_field,
-        step_field,
-    )
+    try:
+        stubs, skipped = import_eval_failures(
+            config,
+            Path(path),
+            adapter_name=adapter_name,
+            subject_field=subject_field,
+            output_field=output_field,
+            step_field=step_field,
+        )
+    except ValueError as e:
+        raise click.ClickException(str(e))
+
     existing = load_corrections(config)
     existing.extend(stubs)
     save_corrections(config, existing)

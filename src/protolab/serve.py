@@ -277,6 +277,67 @@ def create_app(config_path: Path) -> FastAPI:
         return _serialize(correction)
 
     # -------------------------------------------------------------------
+    # POST /api/ingest — bulk correction import
+    # -------------------------------------------------------------------
+    @app.post("/api/ingest", status_code=201)
+    def bulk_ingest(body: list[dict]):
+        """Accept an array of correction dicts, assign IDs, persist."""
+        config = _config()
+        corrections = load_corrections(config)
+
+        created = []
+        for item in body:
+            corr_id = next_id(corrections + created, "corr")
+            now = datetime.now(timezone.utc)
+            correction: dict[str, Any] = {
+                "id": corr_id,
+                "subject": item.get("subject", ""),
+                "date": now,
+                "protocol_version": config.protocol_version,
+                "step": item.get("step", "unspecified"),
+                "protocol_output": item.get("protocol_output", ""),
+                "correct_output": item.get("correct_output", "TODO"),
+                "reasoning": item.get("reasoning", "TODO"),
+            }
+            if "rule" in item:
+                correction["rule"] = item["rule"]
+            if "metadata" in item:
+                correction["metadata"] = item["metadata"]
+            created.append(correction)
+
+        corrections.extend(created)
+        save_corrections(config, corrections)  # type: ignore[arg-type]
+        return [_serialize(c) for c in created]
+
+    # -------------------------------------------------------------------
+    # POST /api/ingest/{adapter_name} — webhook for adapter-specific format
+    # -------------------------------------------------------------------
+    @app.post("/api/ingest/{adapter_name}", status_code=201)
+    def webhook_ingest(adapter_name: str):
+        """Accept eval framework output, run through named adapter."""
+        config = _config()
+
+        # Validate the adapter exists
+        try:
+            from .adapters import get_adapter
+
+            get_adapter(adapter_name, config)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        # The adapter system expects a file path; webhook accepts JSON body
+        # Return adapter info for now — full file-based webhook requires
+        # streaming the body to a temp file
+        return {
+            "adapter": adapter_name,
+            "status": "adapter_available",
+            "detail": (
+                "Webhook ingestion requires posting a file. "
+                "Use POST /api/ingest for direct JSON correction arrays."
+            ),
+        }
+
+    # -------------------------------------------------------------------
     # GET /api/triggers
     # -------------------------------------------------------------------
     @app.get("/api/triggers")
