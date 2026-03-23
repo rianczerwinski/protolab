@@ -203,7 +203,12 @@ def check() -> None:
 
 
 @main.command()
-def analyze() -> None:
+@click.option(
+    "--group-by",
+    default="step",
+    help="Field to group by (default: step). Dot-path for metadata.",
+)
+def analyze(group_by: str) -> None:
     """Cluster analysis of accumulated corrections."""
     try:
         config = load_config()
@@ -212,7 +217,7 @@ def analyze() -> None:
 
     corrections = load_corrections(config)
     rules = load_rules(config)
-    result = analyze_corrections(corrections, rules)
+    result = analyze_corrections(corrections, rules, group_by=group_by)
 
     if not result.clusters:
         console.print("No corrections to analyze.")
@@ -332,3 +337,60 @@ def serve(port: int, host: str) -> None:
     config_path = Path.cwd() / "protolab.toml"
     console.print(f"Starting protolab server on http://{host}:{port}")
     run_server(config_path, host, port)
+
+
+@main.command()
+def adapters() -> None:
+    """List available import adapters."""
+    from .adapters import _REGISTRY
+
+    # Built-in
+    console.print("[bold]Built-in:[/bold]")
+    for name in sorted(_REGISTRY):
+        adapter_cls = _REGISTRY[name]
+        fmts = ", ".join(adapter_cls.formats)
+        console.print(f"  {name:15s} {fmts}")
+
+    # Custom from config
+    try:
+        config = load_config()
+        if config.import_schemas:
+            console.print("\n[bold]Custom (from protolab.toml):[/bold]")
+            for name, schema in config.import_schemas.items():
+                console.print(f"  {name:15s} {schema.format}")
+    except FileNotFoundError:
+        pass
+
+
+@main.command()
+@click.option(
+    "--format",
+    "fmt",
+    default="raw",
+    type=click.Choice(["raw", "promptfoo"]),
+    help="Export format",
+)
+@click.option("--output", "-o", type=click.Path(), help="Output path")
+def export(fmt: str, output: str | None) -> None:
+    """Export the current protocol in a framework-friendly format."""
+    try:
+        config = load_config()
+    except FileNotFoundError as e:
+        raise click.ClickException(str(e))
+
+    from .adapters.export import export_promptfoo, export_raw
+    from .config import load_protocol_text
+
+    protocol_text = load_protocol_text(config)
+
+    if fmt == "promptfoo":
+        result = export_promptfoo(config, protocol_text)
+        if output:
+            Path(output).write_text(result)
+            console.print(f"Exported Promptfoo config to {output}")
+        else:
+            console.print(result)
+    else:
+        out_path = Path(output) if output else config.root / "deploy" / "protocol.md"
+        export_raw(config, protocol_text, out_path)
+        console.print(f"Exported protocol to {out_path}")

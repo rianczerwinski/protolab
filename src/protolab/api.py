@@ -122,9 +122,13 @@ class Project:
 
     # --- Analysis ---
 
-    def analyze(self) -> AnalysisResult:
-        """Run cluster analysis on accumulated corrections."""
-        return analyze_corrections(self.corrections(), self.rules())
+    def analyze(self, group_by: str = "step") -> AnalysisResult:
+        """Run cluster analysis on accumulated corrections.
+
+        *group_by* defaults to ``"step"``. Use dot-path syntax for
+        metadata fields, e.g. ``"metadata.model"``.
+        """
+        return analyze_corrections(self.corrections(), self.rules(), group_by=group_by)
 
     def check(self) -> list[TriggerResult]:
         """Evaluate all resynthesis triggers."""
@@ -151,3 +155,20 @@ class Project:
         """
         prompt = self.assemble_prompt()
         return run_resynthesis(self.config, prompt)
+
+    # --- Export ---
+
+    def export(self, fmt: str = "raw", path: Path | str | None = None) -> str | None:
+        """Export the current protocol in a framework-friendly format.
+
+        Returns the formatted text for ``"promptfoo"`` format, or writes
+        to *path* for ``"raw"`` format and returns ``None``.
+        """
+        from .adapters.export import export_promptfoo, export_raw
+
+        protocol_text = load_protocol_text(self.config)
+        if fmt == "promptfoo":
+            return export_promptfoo(self.config, protocol_text)
+        out_path = Path(path) if path else self.config.root / "deploy" / "protocol.md"
+        export_raw(self.config, protocol_text, out_path)
+        return None

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -313,29 +313,36 @@ def create_app(config_path: Path) -> FastAPI:
     # POST /api/ingest/{adapter_name} — webhook for adapter-specific format
     # -------------------------------------------------------------------
     @app.post("/api/ingest/{adapter_name}", status_code=201)
-    def webhook_ingest(adapter_name: str):
-        """Accept eval framework output, run through named adapter."""
+    def webhook_ingest(adapter_name: str, body: bytes = Body(...)):
+        """Accept raw framework output, parse via named adapter, persist."""
+        import tempfile
+
+        from .adapters import get_adapter
+        from .import_cmd import _stubs_to_corrections
+
         config = _config()
 
-        # Validate the adapter exists
         try:
-            from .adapters import get_adapter
-
-            get_adapter(adapter_name, config)
+            adapter = get_adapter(adapter_name, config)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-        # The adapter system expects a file path; webhook accepts JSON body
-        # Return adapter info for now — full file-based webhook requires
-        # streaming the body to a temp file
-        return {
-            "adapter": adapter_name,
-            "status": "adapter_available",
-            "detail": (
-                "Webhook ingestion requires posting a file. "
-                "Use POST /api/ingest for direct JSON correction arrays."
-            ),
-        }
+        # Adapter.parse() expects a file path — write body to temp file
+        suffix = ".json" if adapter_name == "promptfoo" else ".jsonl"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False, mode="wb") as tmp:
+            tmp.write(body)
+            tmp_path = Path(tmp.name)
+
+        try:
+            stubs = adapter.parse(tmp_path)
+            corrections, _ = _stubs_to_corrections(config, stubs)
+            existing = load_corrections(config)
+            existing.extend(corrections)
+            save_corrections(config, existing)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+        return [_serialize(c) for c in corrections]
 
     # -------------------------------------------------------------------
     # GET /api/triggers

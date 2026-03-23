@@ -66,3 +66,29 @@ def test_malformed_correction_skipped():
     assert result.total_corrections == 2  # total counts all
     assert len(result.clusters) == 1
     assert result.clusters[0].step == "a"
+
+
+def test_group_by_metadata():
+    """group_by='metadata.model' clusters by model name."""
+    corrections = [
+        {"id": "c1", "step": "a", "metadata": {"model": "gpt-4o"}},
+        {"id": "c2", "step": "b", "metadata": {"model": "gpt-4o"}},
+        {"id": "c3", "step": "a", "metadata": {"model": "claude"}},
+    ]
+    result = analyze_corrections(corrections, [], group_by="metadata.model")
+    assert result.unique_steps == 2
+    assert result.clusters[0].step == "gpt-4o"
+    assert result.clusters[0].count == 2
+    assert result.clusters[1].step == "claude"
+    assert result.clusters[1].count == 1
+
+
+def test_group_by_missing_field():
+    """Corrections without the group_by field are skipped."""
+    corrections = [
+        {"id": "c1", "step": "a", "metadata": {"model": "gpt-4o"}},
+        {"id": "c2", "step": "b"},  # no metadata
+    ]
+    result = analyze_corrections(corrections, [], group_by="metadata.model")
+    assert result.total_corrections == 2
+    assert result.unique_steps == 1  # only c1 grouped

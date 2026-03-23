@@ -1,7 +1,8 @@
 """protolab analyze — cluster analysis of accumulated corrections.
 
-Pure computation: no I/O, no AI. Groups corrections by decision point,
-computes concentration ratios, and identifies preventable errors.
+Pure computation: no I/O, no AI. Groups corrections by decision point
+(or any dot-path field), computes concentration ratios, and identifies
+preventable errors.
 """
 
 from __future__ import annotations
@@ -9,7 +10,9 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Any
 
+from .adapters.base import resolve_path
 from .types import Correction, Rule
 
 logger = logging.getLogger(__name__)
@@ -40,8 +43,14 @@ class AnalysisResult:
 def analyze_corrections(
     corrections: list[Correction],
     rules: list[Rule],
+    group_by: str = "step",
 ) -> AnalysisResult:
-    """Cluster corrections by step, compute diagnostics."""
+    """Cluster corrections by a grouping key, compute diagnostics.
+
+    *group_by* defaults to ``"step"`` (the decision point field). Use
+    dot-path syntax to group by metadata fields — e.g.
+    ``"metadata.model"`` groups by the model that produced each correction.
+    """
     total = len(corrections)
 
     if total == 0:
@@ -52,12 +61,16 @@ def analyze_corrections(
             concentration_ratio=0.0,
         )
 
-    # Group corrections by step, skip malformed entries
+    # Group corrections by the specified key
     by_step: dict[str, list[Correction]] = defaultdict(list)
     for corr in corrections:
-        if "step" not in corr:
+        if "." in group_by:
+            key: Any = resolve_path(corr, group_by)
+        else:
+            key = corr.get(group_by)
+        if key is None:
             continue
-        by_step[corr["step"]].append(corr)
+        by_step[str(key)].append(corr)
 
     # Build clusters
     clusters: list[StepCluster] = []

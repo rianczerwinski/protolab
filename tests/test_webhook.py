@@ -83,15 +83,39 @@ def test_bulk_ingest_defaults(api_client, tmp_project):
 
 def test_webhook_unknown_adapter(api_client):
     """POST /api/ingest/{name} with unknown adapter returns 400."""
-    res = api_client.post("/api/ingest/nonexistent_xyz")
+    res = api_client.post(
+        "/api/ingest/nonexistent_xyz",
+        content=b"{}",
+        headers={"content-type": "application/octet-stream"},
+    )
     assert res.status_code == 400
     assert "Unknown adapter" in res.json()["detail"]
 
 
-def test_webhook_known_adapter(api_client):
-    """POST /api/ingest/{name} with known adapter returns info."""
-    res = api_client.post("/api/ingest/promptfoo")
+def test_webhook_promptfoo(api_client, tmp_project):
+    """POST /api/ingest/promptfoo parses body and creates corrections."""
+    import json
+
+    payload = json.dumps(
+        {
+            "results": [
+                {
+                    "success": False,
+                    "response": {"output": "wrong answer"},
+                    "vars": {"input": "test question"},
+                    "test": {"description": "my test"},
+                    "gradingResult": {"reason": "mismatch", "score": 0.0},
+                }
+            ]
+        }
+    ).encode()
+    res = api_client.post(
+        "/api/ingest/promptfoo",
+        content=payload,
+        headers={"content-type": "application/octet-stream"},
+    )
     assert res.status_code == 201
     data = res.json()
-    assert data["adapter"] == "promptfoo"
-    assert data["status"] == "adapter_available"
+    assert len(data) == 1
+    assert data[0]["subject"] == "test question"
+    assert data[0]["protocol_output"] == "wrong answer"
