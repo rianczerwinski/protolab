@@ -18,7 +18,7 @@ from rich.table import Table
 
 from .analyze import analyze_corrections
 from .check import evaluate_triggers
-from .config import load_config
+from .config import load_config, load_protocol_text
 from .correct import batch_correct, extract_rule, interactive_correct
 from .import_cmd import import_eval_failures
 from .init_cmd import scaffold_project
@@ -227,7 +227,7 @@ def resynthesis(run):
     corrections = load_corrections(config)
     rules = load_rules(config)
     analysis = analyze_corrections(corrections, rules)
-    protocol_content = (config.root / config.protocol_path).read_text()
+    protocol_content = load_protocol_text(config)
 
     prompt = assemble_prompt(config, protocol_content, corrections, rules, analysis)
 

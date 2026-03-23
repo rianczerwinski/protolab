@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from protolab.config import Config, TriggerConfig, load_config
+from protolab.config import Config, TriggerConfig, load_config, load_protocol_text
 
 
 def test_defaults(tmp_project):
@@ -99,3 +99,51 @@ def test_path_traversal_rejected(tmp_project):
     )
     with pytest.raises(ValueError, match="escapes the project root"):
         load_config(tmp_project / "protolab.toml")
+
+
+# --- Multi-file protocol assembly ---
+
+def test_load_protocol_text_single_file(tmp_project):
+    """Single-file config: load_protocol_text returns content with no markers."""
+    config = load_config(tmp_project / "protolab.toml")
+    text = load_protocol_text(config)
+    assert text == "# Test Protocol\n\nThis is a test.\n"
+    assert "<!-- file:" not in text
+
+
+def test_load_protocol_text_multi_file(tmp_project):
+    """Multi-file config: sections joined with --- separators and file headers."""
+    (tmp_project / "part1.md").write_text("Part one content.\n")
+    (tmp_project / "part2.md").write_text("Part two content.\n")
+    (tmp_project / "protolab.toml").write_text(
+        '[protocol]\npath = "protocol.md"\npaths = ["part1.md", "part2.md"]\n'
+    )
+    config = load_config(tmp_project / "protolab.toml")
+    text = load_protocol_text(config)
+    assert "<!-- file: part1.md -->" in text
+    assert "<!-- file: part2.md -->" in text
+    assert "---" in text
+    assert "Part one content." in text
+    assert "Part two content." in text
+
+
+def test_load_protocol_text_glob(tmp_project):
+    """Glob patterns expand to matching files, sorted for determinism."""
+    (tmp_project / "aa.md").write_text("AA content.\n")
+    (tmp_project / "bb.md").write_text("BB content.\n")
+    (tmp_project / "protolab.toml").write_text(
+        '[protocol]\npath = "protocol.md"\npaths = ["[ab]*.md"]\n'
+    )
+    config = load_config(tmp_project / "protolab.toml")
+    text = load_protocol_text(config)
+    assert text.index("<!-- file: aa.md -->") < text.index("<!-- file: bb.md -->")
+    assert "AA content." in text
+    assert "BB content." in text
+
+
+def test_load_protocol_text_backward_compat(tmp_project):
+    """path-only config still works: load_protocol_text uses protocol_path."""
+    config = load_config(tmp_project / "protolab.toml")
+    assert config.protocol_paths == []
+    text = load_protocol_text(config)
+    assert "# Test Protocol" in text

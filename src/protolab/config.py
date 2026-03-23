@@ -39,6 +39,7 @@ class Config:
 
     root: Path
     protocol_path: Path
+    protocol_paths: list[str] = field(default_factory=list)  # glob patterns; takes precedence over protocol_path
     protocol_version: str = "v1.0"
     steps: list[str] = field(default_factory=list)
     corrections_path: Path = Path("corrections/correction-log.toml")
@@ -88,6 +89,7 @@ def load_config(path: Path | None = None) -> Config:
     protocol_path = Path(proto.get("path", "protocol.md"))
     protocol_version = proto.get("version", "v1.0")
     steps = proto.get("steps", [])
+    protocol_paths = proto.get("paths", [])
 
     # Path traversal guard — all configured paths must resolve inside root.
     # Without this, a malicious protolab.toml could read arbitrary files
@@ -136,11 +138,15 @@ def load_config(path: Path | None = None) -> Config:
     llm_model = llm.get("model", DEFAULT_LLM_MODEL)
     llm_api_key_env = llm.get("api_key_env", "ANTHROPIC_API_KEY")
 
-    logger.debug("Protocol: %s (version %s)", protocol_path, protocol_version)
+    logger.debug(
+        "Protocol: %s (version %s, paths: %s)",
+        protocol_path, protocol_version, protocol_paths or "single-file",
+    )
 
     return Config(
         root=root,
         protocol_path=protocol_path,
+        protocol_paths=protocol_paths,
         protocol_version=protocol_version,
         steps=steps,
         corrections_path=corrections_path,
@@ -154,3 +160,37 @@ def load_config(path: Path | None = None) -> Config:
         llm_model=llm_model,
         llm_api_key_env=llm_api_key_env,
     )
+
+
+def _resolve_protocol_paths(cfg: Config) -> list[Path]:
+    """Resolve the effective list of protocol file paths.
+
+    If ``protocol_paths`` glob patterns are configured, expands each
+    relative to ``cfg.root`` (sorted for determinism). Falls back to
+    the single ``protocol_path`` file.
+    """
+    if cfg.protocol_paths:
+        files: list[Path] = []
+        for pattern in cfg.protocol_paths:
+            files.extend(sorted(cfg.root.glob(pattern)))
+        return files
+    return [cfg.root / cfg.protocol_path]
+
+
+def load_protocol_text(cfg: Config) -> str:
+    """Assemble protocol text from one or more files.
+
+    Single-file configs return the file content unchanged (no markers).
+    Multi-file configs join sections with ``---`` separators and
+    ``<!-- file: {name} -->`` headers so the origin of each section is
+    traceable in resynthesis output.
+    """
+    paths = _resolve_protocol_paths(cfg)
+    if len(paths) == 1:
+        return paths[0].read_text()
+    sections = [
+        f"<!-- file: {p.name} -->\n{p.read_text()}"
+        for p in paths
+    ]
+    logger.debug("Assembled %d protocol files", len(paths))
+    return "\n\n---\n\n".join(sections)
