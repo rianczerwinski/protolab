@@ -34,7 +34,7 @@ You are rewriting a protocol document. Your goal is to produce a new version tha
 - **Protocol said:** {{ c.protocol_output }}
 - **Correct:** {{ c.correct_output }}
 - **Reasoning:** {{ c.reasoning }}
-{% if c.metadata %}- **Metadata:** {{ c.metadata }}
+{% if c.get('metadata') %}- **Metadata:** {{ c.metadata }}
 {% endif %}{% endfor %}
 
 ## Extracted Rules ({{ rules | length }} total)
