@@ -24,7 +24,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import protolab
 from .analyze import analyze_corrections
@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PORT = 8080
 POLL_INTERVAL = 2.0
+MAX_SSE_CONNECTIONS = 10
 
 
 # ---------------------------------------------------------------------------
@@ -45,19 +46,19 @@ POLL_INTERVAL = 2.0
 # ---------------------------------------------------------------------------
 
 class CorrectionCreate(BaseModel):
-    subject: str
-    step: str
-    protocol_output: str
-    correct_output: str
-    reasoning: str
-    rule: str | None = None
+    subject: str = Field(max_length=200)
+    step: str = Field(max_length=200)
+    protocol_output: str = Field(max_length=10_000)
+    correct_output: str = Field(max_length=10_000)
+    reasoning: str = Field(max_length=10_000)
+    rule: str | None = Field(default=None, max_length=5_000)
 
 
 class ConfigPatch(BaseModel):
-    total_corrections: int | None = None
-    cluster_threshold: float | None = None
-    preventable_errors: int | None = None
-    max_days_since_resynthesis: int | None = None
+    total_corrections: int | None = Field(default=None, ge=1, le=10_000)
+    cluster_threshold: float | None = Field(default=None, ge=0.01, le=1.0)
+    preventable_errors: int | None = Field(default=None, ge=1, le=10_000)
+    max_days_since_resynthesis: int | None = Field(default=None, ge=1, le=3650)
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +115,7 @@ def create_app(config_path: Path) -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -358,8 +359,14 @@ def create_app(config_path: Path) -> FastAPI:
 
         try:
             new_protocol = run_resynthesis(config, prompt)
-        except (ImportError, RuntimeError) as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        except ImportError:
+            raise HTTPException(
+                status_code=500,
+                detail="LLM provider not installed. Install with: pip install protolab[ai]",
+            )
+        except RuntimeError as e:
+            logger.error("Resynthesis failed: %s", e)
+            raise HTTPException(status_code=500, detail="Resynthesis execution failed")
 
         staged_path = stage_resynthesis(config, new_protocol)
         return {
@@ -421,63 +428,74 @@ def create_app(config_path: Path) -> FastAPI:
     # -------------------------------------------------------------------
     # GET /api/events (SSE)
     # -------------------------------------------------------------------
+    _sse_connections = 0
+
     @app.get("/api/events")
     async def event_stream():
+        nonlocal _sse_connections
+        if _sse_connections >= MAX_SSE_CONNECTIONS:
+            raise HTTPException(status_code=503, detail="Too many SSE connections")
+
         async def generate():
-            config = _config()
-            corr_path = config.root / config.corrections_path
-            rules_path = config.root / config.rules_path
-            config_file = app.state.config_path
+            nonlocal _sse_connections
+            _sse_connections += 1
+            try:
+                config = _config()
+                corr_path = config.root / config.corrections_path
+                rules_path = config.root / config.rules_path
+                config_file = app.state.config_path
 
-            mtimes = {
-                "corrections": _mtime(corr_path),
-                "rules": _mtime(rules_path),
-                "config": _mtime(config_file),
-            }
-            prev_corr_ids = {c.get("id") for c in load_corrections(config)}
-            last_ping = time.monotonic()
+                mtimes = {
+                    "corrections": _mtime(corr_path),
+                    "rules": _mtime(rules_path),
+                    "config": _mtime(config_file),
+                }
+                prev_corr_ids = {c.get("id") for c in load_corrections(config)}
+                last_ping = time.monotonic()
 
-            while True:
-                await asyncio.sleep(POLL_INTERVAL)
+                while True:
+                    await asyncio.sleep(POLL_INTERVAL)
 
-                # Check corrections
-                new_mt = _mtime(corr_path)
-                if new_mt != mtimes["corrections"]:
-                    mtimes["corrections"] = new_mt
-                    config = _config()
-                    current = load_corrections(config)
-                    current_ids = {c.get("id") for c in current}
-                    new_ids = current_ids - prev_corr_ids
-                    for c in current:
-                        if c.get("id") in new_ids:
-                            yield f"event: correction_added\ndata: {json.dumps(_serialize(c))}\n\n"
+                    # Check corrections
+                    new_mt = _mtime(corr_path)
+                    if new_mt != mtimes["corrections"]:
+                        mtimes["corrections"] = new_mt
+                        config = _config()
+                        current = load_corrections(config)
+                        current_ids = {c.get("id") for c in current}
+                        new_ids = current_ids - prev_corr_ids
+                        for c in current:
+                            if c.get("id") in new_ids:
+                                yield f"event: correction_added\ndata: {json.dumps(_serialize(c))}\n\n"
 
-                    # Check triggers on correction change
-                    rules = load_rules(config)
-                    triggers = evaluate_triggers(config, current, rules)
-                    for t in triggers:
-                        if t.met:
-                            yield f"event: trigger_met\ndata: {json.dumps({'name': t.name, 'current_value': t.current_value, 'threshold': t.threshold})}\n\n"
+                        # Check triggers on correction change
+                        rules = load_rules(config)
+                        triggers = evaluate_triggers(config, current, rules)
+                        for t in triggers:
+                            if t.met:
+                                yield f"event: trigger_met\ndata: {json.dumps({'name': t.name, 'current_value': t.current_value, 'threshold': t.threshold})}\n\n"
 
-                    prev_corr_ids = current_ids
+                        prev_corr_ids = current_ids
 
-                # Check rules
-                new_mt = _mtime(rules_path)
-                if new_mt != mtimes["rules"]:
-                    mtimes["rules"] = new_mt
-                    yield f"event: rules_changed\ndata: {json.dumps({'timestamp': datetime.now(timezone.utc).isoformat()})}\n\n"
+                    # Check rules
+                    new_mt = _mtime(rules_path)
+                    if new_mt != mtimes["rules"]:
+                        mtimes["rules"] = new_mt
+                        yield f"event: rules_changed\ndata: {json.dumps({'timestamp': datetime.now(timezone.utc).isoformat()})}\n\n"
 
-                # Check config
-                new_mt = _mtime(config_file)
-                if new_mt != mtimes["config"]:
-                    mtimes["config"] = new_mt
-                    config = _config()
-                    yield f"event: config_changed\ndata: {json.dumps({'version': config.protocol_version})}\n\n"
+                    # Check config
+                    new_mt = _mtime(config_file)
+                    if new_mt != mtimes["config"]:
+                        mtimes["config"] = new_mt
+                        config = _config()
+                        yield f"event: config_changed\ndata: {json.dumps({'version': config.protocol_version})}\n\n"
 
-                # Keepalive
-                if time.monotonic() - last_ping > 15:
-                    yield ": ping\n\n"
-                    last_ping = time.monotonic()
+                    # Keepalive
+                    if time.monotonic() - last_ping > 15:
+                        yield ": ping\n\n"
+                        last_ping = time.monotonic()
+            finally:
+                _sse_connections -= 1
 
         return StreamingResponse(generate(), media_type="text/event-stream")
 
@@ -602,14 +620,21 @@ DASHBOARD_HTML = """\
 <script>
 const API = '';
 
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(s));
+  return d.innerHTML;
+}
+
 function renderCorrection(c) {
   return `<div class="correction flash">
-    <div class="meta"><span class="step">${c.step}</span> &middot; ${c.subject} &middot; ${c.date ? c.date.substring(0,10) : ''} &middot; <span style="color:var(--dim)">${c.id}</span></div>
+    <div class="meta"><span class="step">${esc(c.step)}</span> &middot; ${esc(c.subject)} &middot; ${c.date ? esc(c.date.substring(0,10)) : ''} &middot; <span style="color:var(--dim)">${esc(c.id)}</span></div>
     <div class="outputs">
-      <div class="wrong">${c.protocol_output}</div>
-      <div class="right">${c.correct_output}</div>
+      <div class="wrong">${esc(c.protocol_output)}</div>
+      <div class="right">${esc(c.correct_output)}</div>
     </div>
-    <div class="reasoning">${c.reasoning}</div>
+    <div class="reasoning">${esc(c.reasoning)}</div>
   </div>`;
 }
 
@@ -638,14 +663,14 @@ async function refresh() {
 
     // Clusters
     document.getElementById('cluster-body').innerHTML = d.clusters.map(c =>
-      `<tr><td>${c.step}</td><td>${c.count}</td><td>${c.percentage}%</td><td>${c.rules}</td><td>${c.preventable}</td></tr>`
+      `<tr><td>${esc(c.step)}</td><td>${c.count}</td><td>${c.percentage}%</td><td>${c.rules}</td><td>${c.preventable}</td></tr>`
     ).join('');
 
     // Rules summary
     const rc = d.rules.by_confidence || {};
     document.getElementById('rules-summary').innerHTML =
       `<span>${d.rules.total} rules:</span>` +
-      Object.entries(rc).map(([k,v]) => `<span class="${k}">${v} ${k}</span>`).join('');
+      Object.entries(rc).map(([k,v]) => `<span class="${esc(k)}">${v} ${esc(k)}</span>`).join('');
 
     // Config
     const triggers = {};
@@ -686,7 +711,7 @@ function connectSSE() {
     fetch(API + '/api/status').then(r => r.json()).then(d => {
       document.getElementById('triggers-list').innerHTML = d.triggers.map(renderTrigger).join('');
       document.getElementById('cluster-body').innerHTML = d.clusters.map(c =>
-        `<tr><td>${c.step}</td><td>${c.count}</td><td>${c.percentage}%</td><td>${c.rules}</td><td>${c.preventable}</td></tr>`
+        `<tr><td>${esc(c.step)}</td><td>${c.count}</td><td>${c.percentage}%</td><td>${c.rules}</td><td>${c.preventable}</td></tr>`
       ).join('');
     });
   });

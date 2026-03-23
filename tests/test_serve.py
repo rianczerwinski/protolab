@@ -227,11 +227,95 @@ def test_dashboard_html(api_client):
 # ---------------------------------------------------------------------------
 
 
-def test_cors_headers(api_client):
-    """CORS headers are present on responses."""
+def test_cors_localhost_allowed(api_client):
+    """CORS allows localhost origins."""
     res = api_client.get(
         "/api/status",
         headers={"Origin": "http://localhost:9000"},
     )
     assert res.status_code == 200
     assert "access-control-allow-origin" in res.headers
+    assert res.headers["access-control-allow-origin"] == "http://localhost:9000"
+
+
+def test_cors_127_allowed(api_client):
+    """CORS allows 127.0.0.1 origins."""
+    res = api_client.get(
+        "/api/status",
+        headers={"Origin": "http://127.0.0.1:8080"},
+    )
+    assert res.status_code == 200
+    assert res.headers.get("access-control-allow-origin") == "http://127.0.0.1:8080"
+
+
+def test_cors_external_blocked(api_client):
+    """CORS does not allow external origins."""
+    res = api_client.get(
+        "/api/status",
+        headers={"Origin": "https://evil.com"},
+    )
+    assert res.status_code == 200
+    # No CORS header means the browser blocks the response
+    assert res.headers.get("access-control-allow-origin") is None
+
+
+# ---------------------------------------------------------------------------
+# Security: XSS
+# ---------------------------------------------------------------------------
+
+
+def test_xss_escaping_in_dashboard(api_client, tmp_project):
+    """Corrections with HTML in fields don't produce raw HTML in dashboard JS."""
+    # The esc() function is in the JS, so we verify it exists in the served HTML
+    res = api_client.get("/")
+    assert "function esc(s)" in res.text
+    # Verify all renderCorrection interpolations use esc()
+    assert "${c.step}" not in res.text  # raw interpolation should not exist
+    assert "${esc(c.step)}" in res.text
+
+
+# ---------------------------------------------------------------------------
+# Security: Input validation
+# ---------------------------------------------------------------------------
+
+
+def test_input_length_rejected(api_client):
+    """POST correction with oversized field returns 422."""
+    res = api_client.post("/api/corrections", json={
+        "subject": "x" * 201,  # max 200
+        "step": "test",
+        "protocol_output": "a",
+        "correct_output": "b",
+        "reasoning": "c",
+    })
+    assert res.status_code == 422
+
+
+def test_config_bounds_rejected(api_client):
+    """PATCH config with out-of-bounds values returns 422."""
+    # Negative threshold
+    res = api_client.patch("/api/config", json={"total_corrections": -1})
+    assert res.status_code == 422
+
+    # cluster_threshold > 1.0
+    res = api_client.patch("/api/config", json={"cluster_threshold": 5.0})
+    assert res.status_code == 422
+
+    # Zero preventable_errors
+    res = api_client.patch("/api/config", json={"preventable_errors": 0})
+    assert res.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Security: Error sanitization
+# ---------------------------------------------------------------------------
+
+
+def test_resynthesis_error_sanitized(api_client):
+    """POST resynthesis --run without anthropic returns generic error, no path leak."""
+    res = api_client.post("/api/resynthesis?run=true")
+    assert res.status_code == 500
+    detail = res.json()["detail"]
+    # Should not contain filesystem paths or import details
+    assert "/" not in detail or "pip install" in detail
+    assert "anthropic" not in detail.lower() or "pip install" in detail
