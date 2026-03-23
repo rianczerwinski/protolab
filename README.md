@@ -114,4 +114,4 @@ editable configuration — all live-updating via SSE when corrections are added
 
 ## License
 
-MIT. See [TRADEMARK.md](TRADEMARK.md) for trademark notice.
+MIT
