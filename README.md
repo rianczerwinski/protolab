@@ -107,6 +107,11 @@ editable configuration — all live-updating via SSE when corrections are added
 - [Resynthesis](docs/resynthesis.md) — Prompt design and template customization
 - [Integration](docs/integration.md) — Eval frameworks, CI/CD, team workflows
 
+### Internal
+
+- [Spec](docs/internal/spec.md) — Implementation specification
+- [Architecture](docs/internal/architecture.md) — Vision, design philosophy, refinement cycle theory
+
 ## License
 
 MIT. See [TRADEMARK.md](TRADEMARK.md) for trademark notice.

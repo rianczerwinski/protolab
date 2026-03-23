@@ -24,7 +24,3 @@ corrections/
 templates/
 resynthesis/
 protocol/versions/
-
-# Spec documents (development artifacts, not shipped)
-protolab-spec.md
-protolab-architecture.md
