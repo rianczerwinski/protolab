@@ -70,10 +70,12 @@ def batch_correct(config: Config, path: Path) -> list[Correction]:
     suffix = path.suffix.lower()
 
     if suffix == ".json":
-        with open(path) as f:
+        with path.open() as f:
             raw = json.load(f)
         if not isinstance(raw, list):
-            raise ValueError(f"Expected a JSON array in '{path}', got {type(raw).__name__}")
+            raise ValueError(
+                f"Expected a JSON array in '{path}', got {type(raw).__name__}"
+            )
     elif suffix == ".toml":
         data = load_toml(path)
         raw = data.get("corrections", [])

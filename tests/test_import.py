@@ -12,12 +12,17 @@ def test_jsonl_import(tmp_project, sample_config):
     jsonl = tmp_project / "evals.jsonl"
     lines = []
     for i in range(5):
-        lines.append(f'{{"subject": "case_{i}", "output": "wrong_{i}", "step": "step_{i}"}}')
+        lines.append(
+            f'{{"subject": "case_{i}", "output": "wrong_{i}", "step": "step_{i}"}}'
+        )
     jsonl.write_text("\n".join(lines) + "\n")
 
-    stubs, skipped = import_eval_failures(
-        sample_config, jsonl,
-        subject_field="subject", output_field="output", step_field="step",
+    stubs, _skipped = import_eval_failures(
+        sample_config,
+        jsonl,
+        subject_field="subject",
+        output_field="output",
+        step_field="step",
     )
     assert len(stubs) == 5
     assert all(s["correct_output"] == "TODO" for s in stubs)
@@ -28,11 +33,16 @@ def test_jsonl_import(tmp_project, sample_config):
 def test_csv_import(tmp_project, sample_config):
     """CSV with header row — correct field mapping."""
     csv_file = tmp_project / "evals.csv"
-    csv_file.write_text("subject,output,step\ncase_a,wrong_a,step_a\ncase_b,wrong_b,step_b\n")
+    csv_file.write_text(
+        "subject,output,step\ncase_a,wrong_a,step_a\ncase_b,wrong_b,step_b\n"
+    )
 
-    stubs, skipped = import_eval_failures(
-        sample_config, csv_file,
-        subject_field="subject", output_field="output", step_field="step",
+    stubs, _skipped = import_eval_failures(
+        sample_config,
+        csv_file,
+        subject_field="subject",
+        output_field="output",
+        step_field="step",
     )
     assert len(stubs) == 2
     assert stubs[0]["subject"] == "case_a"
@@ -44,9 +54,12 @@ def test_custom_fields(tmp_project, sample_config):
     jsonl = tmp_project / "custom.jsonl"
     jsonl.write_text('{"input": "hello", "expected": "world", "category": "greet"}\n')
 
-    stubs, skipped = import_eval_failures(
-        sample_config, jsonl,
-        subject_field="input", output_field="expected", step_field="category",
+    stubs, _skipped = import_eval_failures(
+        sample_config,
+        jsonl,
+        subject_field="input",
+        output_field="expected",
+        step_field="category",
     )
     assert len(stubs) == 1
     assert stubs[0]["subject"] == "hello"
@@ -66,8 +79,11 @@ def test_missing_field(tmp_project, sample_config):
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         stubs, skipped = import_eval_failures(
-            sample_config, jsonl,
-            subject_field="subject", output_field="output", step_field="step",
+            sample_config,
+            jsonl,
+            subject_field="subject",
+            output_field="output",
+            step_field="step",
         )
     assert len(stubs) == 1  # Second row skipped
     assert skipped == 1

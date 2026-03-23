@@ -9,7 +9,6 @@ import pytest
 
 from protolab.config import Config, load_config
 
-
 RESYNTHESIS_TEMPLATE = """\
 # Protocol Resynthesis
 
@@ -42,9 +41,7 @@ def tmp_project(tmp_path: Path) -> Path:
     """Create a temp directory with minimal protolab.toml, empty protocol.md,
     empty correction/rule files. Returns the project root path."""
     # Config
-    (tmp_path / "protolab.toml").write_text(
-        '[protocol]\npath = "protocol.md"\n'
-    )
+    (tmp_path / "protolab.toml").write_text('[protocol]\npath = "protocol.md"\n')
     # Protocol file
     (tmp_path / "protocol.md").write_text("# Test Protocol\n\nThis is a test.\n")
     # Correction and rule files
@@ -75,66 +72,106 @@ def sample_corrections() -> list[dict]:
     return [
         # Classification: 5 corrections (days 1, 2, 4, 6, 8)
         {
-            "id": "corr_001", "subject": "case_alpha", "date": dt(1),
-            "protocol_version": "v1.0", "step": "classification",
-            "protocol_output": "Type 4w5", "correct_output": "Type 5w4",
+            "id": "corr_001",
+            "subject": "case_alpha",
+            "date": dt(1),
+            "protocol_version": "v1.0",
+            "step": "classification",
+            "protocol_output": "Type 4w5",
+            "correct_output": "Type 5w4",
             "reasoning": "Withdrawal serves curiosity, not identity.",
             "rule": "When withdrawal serves curiosity, classify as 5 not 4.",
         },
         {
-            "id": "corr_002", "subject": "case_beta", "date": dt(2),
-            "protocol_version": "v1.0", "step": "classification",
-            "protocol_output": "Type 9w1", "correct_output": "Type 6w5",
+            "id": "corr_002",
+            "subject": "case_beta",
+            "date": dt(2),
+            "protocol_version": "v1.0",
+            "step": "classification",
+            "protocol_output": "Type 9w1",
+            "correct_output": "Type 6w5",
             "reasoning": "Apparent passivity is conflict avoidance from anxiety.",
         },
         {
-            "id": "corr_003", "subject": "case_gamma", "date": dt(4),
-            "protocol_version": "v1.0", "step": "classification",
-            "protocol_output": "Type 3w2", "correct_output": "Type 7w6",
+            "id": "corr_003",
+            "subject": "case_gamma",
+            "date": dt(4),
+            "protocol_version": "v1.0",
+            "step": "classification",
+            "protocol_output": "Type 3w2",
+            "correct_output": "Type 7w6",
             "reasoning": "Achievement focus masks avoidance of pain.",
         },
         {
-            "id": "corr_004", "subject": "case_delta", "date": dt(6),
-            "protocol_version": "v1.0", "step": "classification",
-            "protocol_output": "Type 1w9", "correct_output": "Type 6w5",
+            "id": "corr_004",
+            "subject": "case_delta",
+            "date": dt(6),
+            "protocol_version": "v1.0",
+            "step": "classification",
+            "protocol_output": "Type 1w9",
+            "correct_output": "Type 6w5",
             "reasoning": "Rigidity is security-seeking, not perfection-seeking.",
         },
         {
-            "id": "corr_005", "subject": "case_epsilon", "date": dt(8),
-            "protocol_version": "v1.0", "step": "classification",
-            "protocol_output": "Type 2w3", "correct_output": "Type 9w1",
+            "id": "corr_005",
+            "subject": "case_epsilon",
+            "date": dt(8),
+            "protocol_version": "v1.0",
+            "step": "classification",
+            "protocol_output": "Type 2w3",
+            "correct_output": "Type 9w1",
             "reasoning": "Helpfulness is merging, not pride-driven.",
         },
         # Severity assessment: 3 corrections (days 2, 5, 7)
         {
-            "id": "corr_006", "subject": "case_zeta", "date": dt(2),
-            "protocol_version": "v1.0", "step": "severity_assessment",
-            "protocol_output": "moderate", "correct_output": "high",
+            "id": "corr_006",
+            "subject": "case_zeta",
+            "date": dt(2),
+            "protocol_version": "v1.0",
+            "step": "severity_assessment",
+            "protocol_output": "moderate",
+            "correct_output": "high",
             "reasoning": "Compounding factors were missed.",
         },
         {
-            "id": "corr_007", "subject": "case_eta", "date": dt(5),
-            "protocol_version": "v1.0", "step": "severity_assessment",
-            "protocol_output": "low", "correct_output": "moderate",
+            "id": "corr_007",
+            "subject": "case_eta",
+            "date": dt(5),
+            "protocol_version": "v1.0",
+            "step": "severity_assessment",
+            "protocol_output": "low",
+            "correct_output": "moderate",
             "reasoning": "Subclinical pattern underestimated.",
         },
         {
-            "id": "corr_008", "subject": "case_theta", "date": dt(7),
-            "protocol_version": "v1.0", "step": "severity_assessment",
-            "protocol_output": "moderate", "correct_output": "high",
+            "id": "corr_008",
+            "subject": "case_theta",
+            "date": dt(7),
+            "protocol_version": "v1.0",
+            "step": "severity_assessment",
+            "protocol_output": "moderate",
+            "correct_output": "high",
             "reasoning": "Duration of pattern not weighted.",
         },
         # Differential: 2 corrections (days 3, 9)
         {
-            "id": "corr_009", "subject": "case_iota", "date": dt(3),
-            "protocol_version": "v1.0", "step": "differential",
-            "protocol_output": "primary: anxiety", "correct_output": "primary: depression",
+            "id": "corr_009",
+            "subject": "case_iota",
+            "date": dt(3),
+            "protocol_version": "v1.0",
+            "step": "differential",
+            "protocol_output": "primary: anxiety",
+            "correct_output": "primary: depression",
             "reasoning": "Anxiety is secondary to anhedonia.",
         },
         {
-            "id": "corr_010", "subject": "case_kappa", "date": dt(9),
-            "protocol_version": "v1.0", "step": "differential",
-            "protocol_output": "primary: ADHD", "correct_output": "primary: trauma",
+            "id": "corr_010",
+            "subject": "case_kappa",
+            "date": dt(9),
+            "protocol_version": "v1.0",
+            "step": "differential",
+            "protocol_output": "primary: ADHD",
+            "correct_output": "primary: trauma",
             "reasoning": "Attention deficit is trauma-driven hypervigilance.",
         },
     ]
@@ -182,9 +219,10 @@ def sample_config(tmp_project: Path) -> Config:
 @pytest.fixture
 def api_client(tmp_project: Path):
     """Return a FastAPI TestClient pointed at a tmp_project."""
-    fastapi = pytest.importorskip("fastapi")
-    from protolab.serve import create_app
+    pytest.importorskip("fastapi")
     from starlette.testclient import TestClient
+
+    from protolab.serve import create_app
 
     app = create_app(tmp_project / "protolab.toml")
     return TestClient(app)

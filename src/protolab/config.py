@@ -13,6 +13,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+
 logger = logging.getLogger(__name__)
 
 CONFIG_FILENAME = "protolab.toml"
@@ -39,7 +44,8 @@ class Config:
 
     root: Path
     protocol_path: Path
-    protocol_paths: list[str] = field(default_factory=list)  # glob patterns; takes precedence over protocol_path
+    # glob patterns; takes precedence over protocol_path when non-empty
+    protocol_paths: list[str] = field(default_factory=list)
     protocol_version: str = "v1.0"
     steps: list[str] = field(default_factory=list)
     corrections_path: Path = Path("corrections/correction-log.toml")
@@ -63,22 +69,16 @@ def load_config(path: Path | None = None) -> Config:
     Validates that the protocol file exists and that all configured paths
     stay within the project root (path traversal guard).
     """
-    if sys.version_info >= (3, 11):
-        import tomllib
-    else:
-        import tomli as tomllib
-
     if path is None:
         path = Path.cwd() / CONFIG_FILENAME
     path = Path(path)
 
     if not path.exists():
         raise FileNotFoundError(
-            f"Config file not found at '{path}'. "
-            "Run `protolab init` to create one."
+            f"Config file not found at '{path}'. Run `protolab init` to create one."
         )
 
-    with open(path, "rb") as f:
+    with path.open("rb") as f:
         data = tomllib.load(f)
 
     root = path.parent
@@ -140,7 +140,9 @@ def load_config(path: Path | None = None) -> Config:
 
     logger.debug(
         "Protocol: %s (version %s, paths: %s)",
-        protocol_path, protocol_version, protocol_paths or "single-file",
+        protocol_path,
+        protocol_version,
+        protocol_paths or "single-file",
     )
 
     return Config(
@@ -188,9 +190,6 @@ def load_protocol_text(cfg: Config) -> str:
     paths = _resolve_protocol_paths(cfg)
     if len(paths) == 1:
         return paths[0].read_text()
-    sections = [
-        f"<!-- file: {p.name} -->\n{p.read_text()}"
-        for p in paths
-    ]
+    sections = [f"<!-- file: {p.name} -->\n{p.read_text()}" for p in paths]
     logger.debug("Assembled %d protocol files", len(paths))
     return "\n\n---\n\n".join(sections)

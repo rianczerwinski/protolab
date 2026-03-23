@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
-from protolab.config import Config, TriggerConfig, load_config, load_protocol_text
+from protolab.config import load_config, load_protocol_text
 
 
 def test_defaults(tmp_project):
@@ -78,17 +78,15 @@ api_key_env = "MY_KEY"
 
 def test_missing_protocol(tmp_project):
     """Protocol file doesn't exist — clear error."""
-    (tmp_project / "protolab.toml").write_text(
-        '[protocol]\npath = "nonexistent.md"\n'
-    )
+    (tmp_project / "protolab.toml").write_text('[protocol]\npath = "nonexistent.md"\n')
     with pytest.raises(FileNotFoundError, match="Protocol file not found"):
         load_config(tmp_project / "protolab.toml")
 
 
 def test_invalid_toml(tmp_project):
-    """Malformed TOML — clear error."""
+    """Malformed TOML — raises ValueError (TOMLDecodeError is a ValueError subclass)."""
     (tmp_project / "protolab.toml").write_text("this is not [valid toml\n")
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         load_config(tmp_project / "protolab.toml")
 
 
@@ -102,6 +100,7 @@ def test_path_traversal_rejected(tmp_project):
 
 
 # --- Multi-file protocol assembly ---
+
 
 def test_load_protocol_text_single_file(tmp_project):
     """Single-file config: load_protocol_text returns content with no markers."""

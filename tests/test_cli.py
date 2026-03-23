@@ -37,11 +37,22 @@ def test_correct_batch(tmp_path, monkeypatch):
     runner = CliRunner()
     _init_project(runner, tmp_path)
     batch = tmp_path / "batch.json"
-    batch.write_text(json.dumps([
-        {"subject": "x", "step": "a", "protocol_output": "b",
-         "correct_output": "c", "reasoning": "d"},
-    ]))
-    result = runner.invoke(main, ["correct", "--batch", str(batch)], catch_exceptions=False)
+    batch.write_text(
+        json.dumps(
+            [
+                {
+                    "subject": "x",
+                    "step": "a",
+                    "protocol_output": "b",
+                    "correct_output": "c",
+                    "reasoning": "d",
+                },
+            ]
+        )
+    )
+    result = runner.invoke(
+        main, ["correct", "--batch", str(batch)], catch_exceptions=False
+    )
     assert result.exit_code == 0
     assert "1 correction" in result.output
     # Verify written to disk
@@ -57,7 +68,9 @@ def test_import_cmd(tmp_path, monkeypatch):
     jsonl = tmp_path / "evals.jsonl"
     jsonl.write_text('{"subject":"a","output":"b","step":"c"}\n')
     result = runner.invoke(
-        main, ["import", str(jsonl)], catch_exceptions=False,
+        main,
+        ["import", str(jsonl)],
+        catch_exceptions=False,
     )
     assert result.exit_code == 0
     assert "1 correction stub" in result.output
@@ -80,8 +93,13 @@ def test_check_triggers_met(tmp_path, monkeypatch):
     # Add enough corrections to trigger total_corrections (threshold=10)
     batch = tmp_path / "batch.json"
     corrections = [
-        {"subject": f"s{i}", "step": "a", "protocol_output": "x",
-         "correct_output": "y", "reasoning": "z"}
+        {
+            "subject": f"s{i}",
+            "step": "a",
+            "protocol_output": "x",
+            "correct_output": "y",
+            "reasoning": "z",
+        }
         for i in range(10)
     ]
     batch.write_text(json.dumps(corrections))
@@ -97,10 +115,19 @@ def test_analyze_output(tmp_path, monkeypatch):
     runner = CliRunner()
     _init_project(runner, tmp_path)
     batch = tmp_path / "batch.json"
-    batch.write_text(json.dumps([
-        {"subject": "s1", "step": "classification", "protocol_output": "x",
-         "correct_output": "y", "reasoning": "z"},
-    ]))
+    batch.write_text(
+        json.dumps(
+            [
+                {
+                    "subject": "s1",
+                    "step": "classification",
+                    "protocol_output": "x",
+                    "correct_output": "y",
+                    "reasoning": "z",
+                },
+            ]
+        )
+    )
     runner.invoke(main, ["correct", "--batch", str(batch)], catch_exceptions=False)
     result = runner.invoke(main, ["analyze"], catch_exceptions=False)
     assert result.exit_code == 0

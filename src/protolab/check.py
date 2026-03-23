@@ -37,12 +37,14 @@ def evaluate_triggers(
     total = len(corrections)
 
     # 1. Total corrections
-    results.append(TriggerResult(
-        name="total_corrections",
-        met=total >= config.triggers.total_corrections,
-        current_value=total,
-        threshold=config.triggers.total_corrections,
-    ))
+    results.append(
+        TriggerResult(
+            name="total_corrections",
+            met=total >= config.triggers.total_corrections,
+            current_value=total,
+            threshold=config.triggers.total_corrections,
+        )
+    )
 
     # 2. Cluster threshold — what fraction of corrections hit the same step?
     if total > 0:
@@ -52,12 +54,14 @@ def evaluate_triggers(
         ratio = max_count / total
     else:
         ratio = 0.0
-    results.append(TriggerResult(
-        name="cluster_threshold",
-        met=ratio >= config.triggers.cluster_threshold,
-        current_value=round(ratio, 3),
-        threshold=config.triggers.cluster_threshold,
-    ))
+    results.append(
+        TriggerResult(
+            name="cluster_threshold",
+            met=ratio >= config.triggers.cluster_threshold,
+            current_value=round(ratio, 3),
+            threshold=config.triggers.cluster_threshold,
+        )
+    )
 
     # 3. Preventable errors — corrections on steps that already have rules
     preventable = 0
@@ -67,39 +71,51 @@ def evaluate_triggers(
         for rule in rules:
             if "decision_point" not in rule or "date_added" not in rule:
                 continue
-            if (rule["decision_point"] == corr["step"]
-                    and rule["date_added"] <= corr["date"]):
+            if (
+                rule["decision_point"] == corr["step"]
+                and rule["date_added"] <= corr["date"]
+            ):
                 preventable += 1
                 break  # one matching rule is enough — avoid double-counting
-    results.append(TriggerResult(
-        name="preventable_errors",
-        met=preventable >= config.triggers.preventable_errors,
-        current_value=preventable,
-        threshold=config.triggers.preventable_errors,
-    ))
+    results.append(
+        TriggerResult(
+            name="preventable_errors",
+            met=preventable >= config.triggers.preventable_errors,
+            current_value=preventable,
+            threshold=config.triggers.preventable_errors,
+        )
+    )
 
     # 4. Days since last resynthesis
     if config.triggers.max_days_since_resynthesis is not None:
         if config.last_resynthesis_date is None:
             # No previous resynthesis — trigger is not applicable
-            results.append(TriggerResult(
-                name="max_days_since_resynthesis",
-                met=False,
-                current_value=0,
-                threshold=config.triggers.max_days_since_resynthesis,
-            ))
+            results.append(
+                TriggerResult(
+                    name="max_days_since_resynthesis",
+                    met=False,
+                    current_value=0,
+                    threshold=config.triggers.max_days_since_resynthesis,
+                )
+            )
         else:
             days = (datetime.now(timezone.utc) - config.last_resynthesis_date).days
-            results.append(TriggerResult(
-                name="max_days_since_resynthesis",
-                met=days >= config.triggers.max_days_since_resynthesis,
-                current_value=days,
-                threshold=config.triggers.max_days_since_resynthesis,
-            ))
+            results.append(
+                TriggerResult(
+                    name="max_days_since_resynthesis",
+                    met=days >= config.triggers.max_days_since_resynthesis,
+                    current_value=days,
+                    threshold=config.triggers.max_days_since_resynthesis,
+                )
+            )
 
     for r in results:
-        logger.debug("Trigger %s: %s (current=%s, threshold=%s)",
-                      r.name, "MET" if r.met else "unmet",
-                      r.current_value, r.threshold)
+        logger.debug(
+            "Trigger %s: %s (current=%s, threshold=%s)",
+            r.name,
+            "MET" if r.met else "unmet",
+            r.current_value,
+            r.threshold,
+        )
 
     return results

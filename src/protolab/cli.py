@@ -22,7 +22,12 @@ from .config import load_config, load_protocol_text
 from .correct import batch_correct, extract_rule, interactive_correct
 from .import_cmd import import_eval_failures
 from .init_cmd import scaffold_project
-from .resynthesis import assemble_prompt, promote_resynthesis, run_resynthesis, stage_resynthesis
+from .resynthesis import (
+    assemble_prompt,
+    promote_resynthesis,
+    run_resynthesis,
+    stage_resynthesis,
+)
 from .status import render_status
 from .store import load_corrections, load_rules, save_corrections, save_rules
 
@@ -46,7 +51,7 @@ def _version_increment(version: str) -> str:
 
 @click.group()
 @click.option("-v", "--verbose", is_flag=True, help="Enable debug logging")
-def main(verbose):
+def main(verbose: bool) -> None:
     """Protolab: error-driven compression for protocol documents."""
     level = logging.DEBUG if verbose else logging.WARNING
     logging.basicConfig(level=level, format="%(name)s: %(message)s")
@@ -54,7 +59,7 @@ def main(verbose):
 
 @main.command()
 @click.option("--bare", is_flag=True, help="Non-interactive, all defaults")
-def init(bare):
+def init(bare: bool) -> None:
     """Initialize a protolab project in the current directory."""
     try:
         scaffold_project(bare=bare)
@@ -63,8 +68,10 @@ def init(bare):
 
 
 @main.command()
-@click.option("--batch", type=click.Path(exists=True), help="Import corrections from file")
-def correct(batch):
+@click.option(
+    "--batch", type=click.Path(exists=True), help="Import corrections from file"
+)
+def correct(batch: str | None) -> None:
     """Log a correction to the protocol."""
     try:
         config = load_config()
@@ -97,18 +104,22 @@ def correct(batch):
             existing_rules = load_rules(config)
             existing_rules.append(rule)
             save_rules(config, existing_rules)
-            console.print(Panel(
-                f"[bold]Rule {rule['id']}:[/bold] {rule['rule']}",
-                title="Rule Extracted",
-            ))
+            console.print(
+                Panel(
+                    f"[bold]Rule {rule['id']}:[/bold] {rule['rule']}",
+                    title="Rule Extracted",
+                )
+            )
 
-        console.print(Panel(
-            f"[bold]{correction['id']}[/bold] — {correction['step']}\n"
-            f"Subject: {correction['subject']}\n"
-            f"Protocol said: {correction['protocol_output']}\n"
-            f"Correct: {correction['correct_output']}",
-            title="Correction Logged",
-        ))
+        console.print(
+            Panel(
+                f"[bold]{correction['id']}[/bold] — {correction['step']}\n"
+                f"Subject: {correction['subject']}\n"
+                f"Protocol said: {correction['protocol_output']}\n"
+                f"Correct: {correction['correct_output']}",
+                title="Correction Logged",
+            )
+        )
 
 
 @main.command("import")
@@ -116,7 +127,12 @@ def correct(batch):
 @click.option("--subject-field", default="subject")
 @click.option("--output-field", default="output")
 @click.option("--step-field", default="step")
-def import_cmd(path, subject_field, output_field, step_field):
+def import_cmd(
+    path: str,
+    subject_field: str,
+    output_field: str,
+    step_field: str,
+) -> None:
     """Import eval failures as correction stubs."""
     try:
         config = load_config()
@@ -124,7 +140,11 @@ def import_cmd(path, subject_field, output_field, step_field):
         raise click.ClickException(str(e))
 
     stubs, skipped = import_eval_failures(
-        config, Path(path), subject_field, output_field, step_field,
+        config,
+        Path(path),
+        subject_field,
+        output_field,
+        step_field,
     )
     existing = load_corrections(config)
     existing.extend(stubs)
@@ -137,7 +157,7 @@ def import_cmd(path, subject_field, output_field, step_field):
 
 
 @main.command()
-def check():
+def check() -> None:
     """Evaluate resynthesis triggers."""
     try:
         config = load_config()
@@ -164,12 +184,14 @@ def check():
     console.print(table)
 
     if any_met:
-        console.print("\n[bold]Resynthesis recommended.[/bold] Run `protolab resynthesis`")
+        console.print(
+            "\n[bold]Resynthesis recommended.[/bold] Run `protolab resynthesis`"
+        )
         sys.exit(1)
 
 
 @main.command()
-def analyze():
+def analyze() -> None:
     """Cluster analysis of accumulated corrections."""
     try:
         config = load_config()
@@ -217,7 +239,7 @@ def analyze():
 
 @main.command()
 @click.option("--run", is_flag=True, help="Execute via LLM API")
-def resynthesis(run):
+def resynthesis(run: bool) -> None:
     """Assemble resynthesis prompt, optionally execute via LLM."""
     try:
         config = load_config()
@@ -269,7 +291,7 @@ def resynthesis(run):
 
 
 @main.command()
-def status():
+def status() -> None:
     """Dashboard showing protocol, corrections, rules, and trigger status."""
     try:
         config = load_config()
@@ -282,7 +304,7 @@ def status():
 @main.command()
 @click.option("--port", default=8080, help="Port to listen on")
 @click.option("--host", default="127.0.0.1", help="Host to bind to")
-def serve(port, host):
+def serve(port: int, host: str) -> None:
     """Start the protolab HTTP server and web dashboard."""
     try:
         from .serve import run_server
@@ -291,7 +313,7 @@ def serve(port, host):
             "The 'serve' extra is required. Install with: pip install protolab[serve]"
         )
     try:
-        config = load_config()
+        load_config()  # validate config exists before starting the server
     except FileNotFoundError as e:
         raise click.ClickException(str(e))
 

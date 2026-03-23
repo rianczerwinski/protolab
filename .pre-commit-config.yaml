@@ -1,0 +1,19 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - tomli>=2.0
+          - typing_extensions>=4.0
+          - jinja2>=3.0
+          - tomli-w>=1.0
+          - click>=8.0
+          - rich>=13.0
+        args: [--config-file=pyproject.toml]

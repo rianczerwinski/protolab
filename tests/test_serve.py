@@ -2,17 +2,12 @@
 
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
-from pathlib import Path
-
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
 
-from protolab.store import save_corrections, save_rules
-from protolab.config import load_config
-
+from protolab.config import load_config  # noqa: E402
+from protolab.store import save_corrections, save_rules  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Status
@@ -31,7 +26,9 @@ def test_get_status_empty(api_client):
     assert data["protocol"]["version"] == "v1.0"
 
 
-def test_get_status_with_data(api_client, tmp_project, sample_corrections, sample_rules):
+def test_get_status_with_data(
+    api_client, tmp_project, sample_corrections, sample_rules
+):
     """With corrections and rules, all fields are populated."""
     config = load_config(tmp_project / "protolab.toml")
     save_corrections(config, sample_corrections)
@@ -99,13 +96,16 @@ def test_get_correction_not_found(api_client):
 
 def test_post_correction(api_client, tmp_project):
     """POST /api/corrections creates a correction with auto-assigned ID."""
-    res = api_client.post("/api/corrections", json={
-        "subject": "test_case",
-        "step": "classification",
-        "protocol_output": "Type 4",
-        "correct_output": "Type 5",
-        "reasoning": "Domain-exhaustion, not trust-failure.",
-    })
+    res = api_client.post(
+        "/api/corrections",
+        json={
+            "subject": "test_case",
+            "step": "classification",
+            "protocol_output": "Type 4",
+            "correct_output": "Type 5",
+            "reasoning": "Domain-exhaustion, not trust-failure.",
+        },
+    )
     assert res.status_code == 201
     data = res.json()
     assert data["id"] == "corr_001"
@@ -119,19 +119,23 @@ def test_post_correction(api_client, tmp_project):
 
 def test_post_correction_with_rule(api_client, tmp_project):
     """POST with rule field extracts and persists the rule."""
-    res = api_client.post("/api/corrections", json={
-        "subject": "test_case",
-        "step": "classification",
-        "protocol_output": "Type 4",
-        "correct_output": "Type 5",
-        "reasoning": "Domain-exhaustion, not trust-failure.",
-        "rule": "Serial disenchantment as domain-exhaustion points to 5.",
-    })
+    res = api_client.post(
+        "/api/corrections",
+        json={
+            "subject": "test_case",
+            "step": "classification",
+            "protocol_output": "Type 4",
+            "correct_output": "Type 5",
+            "reasoning": "Domain-exhaustion, not trust-failure.",
+            "rule": "Serial disenchantment as domain-exhaustion points to 5.",
+        },
+    )
     assert res.status_code == 201
 
     # Check rule was created
     config = load_config(tmp_project / "protolab.toml")
     from protolab.store import load_rules as _load_rules
+
     rules = _load_rules(config)
     assert len(rules) == 1
     assert rules[0]["rule"] == "Serial disenchantment as domain-exhaustion points to 5."
@@ -193,10 +197,13 @@ def test_get_protocol_directory(api_client, tmp_project):
 
 def test_patch_config(api_client, tmp_project):
     """PATCH /api/config updates trigger thresholds in protolab.toml."""
-    res = api_client.patch("/api/config", json={
-        "total_corrections": 20,
-        "cluster_threshold": 0.5,
-    })
+    res = api_client.patch(
+        "/api/config",
+        json={
+            "total_corrections": 20,
+            "cluster_threshold": 0.5,
+        },
+    )
     assert res.status_code == 200
     data = res.json()
     assert data["total_corrections"] == 20
@@ -281,13 +288,16 @@ def test_xss_escaping_in_dashboard(api_client, tmp_project):
 
 def test_input_length_rejected(api_client):
     """POST correction with oversized field returns 422."""
-    res = api_client.post("/api/corrections", json={
-        "subject": "x" * 201,  # max 200
-        "step": "test",
-        "protocol_output": "a",
-        "correct_output": "b",
-        "reasoning": "c",
-    })
+    res = api_client.post(
+        "/api/corrections",
+        json={
+            "subject": "x" * 201,  # max 200
+            "step": "test",
+            "protocol_output": "a",
+            "correct_output": "b",
+            "reasoning": "c",
+        },
+    )
     assert res.status_code == 422
 
 

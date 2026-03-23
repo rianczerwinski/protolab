@@ -14,25 +14,31 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 import protolab
+
 from .analyze import analyze_corrections
 from .check import evaluate_triggers
 from .config import load_config
 from .correct import extract_rule
-from .resynthesis import assemble_prompt, promote_resynthesis, run_resynthesis, stage_resynthesis
+from .resynthesis import (
+    assemble_prompt,
+    promote_resynthesis,
+    run_resynthesis,
+    stage_resynthesis,
+)
 from .store import load_corrections, load_rules, next_id, save_corrections, save_rules
+from .types import Correction
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +50,7 @@ MAX_SSE_CONNECTIONS = 10
 # ---------------------------------------------------------------------------
 # Pydantic models
 # ---------------------------------------------------------------------------
+
 
 class CorrectionCreate(BaseModel):
     subject: str = Field(max_length=200)
@@ -65,7 +72,8 @@ class ConfigPatch(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _serialize(obj: dict) -> dict:
+
+def _serialize(obj: dict[str, Any]) -> dict[str, Any]:
     """Make a Correction or Rule dict JSON-serializable."""
     result = dict(obj)
     for key, val in result.items():
@@ -82,7 +90,7 @@ def _mtime(path: Path) -> float:
         return 0.0
 
 
-def _protocol_info(config) -> dict:
+def _protocol_info(config) -> dict[str, Any]:
     """Build protocol metadata dict."""
     proto_path = config.root / config.protocol_path
     try:
@@ -100,6 +108,7 @@ def _protocol_info(config) -> dict:
 # ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
+
 
 def create_app(config_path: Path) -> FastAPI:
     """Create and return the FastAPI application.
@@ -205,9 +214,9 @@ def create_app(config_path: Path) -> FastAPI:
                 filtered = []
                 for c in corrections:
                     d = c.get("date")
-                    if isinstance(d, datetime) and d >= since_dt:
-                        filtered.append(c)
-                    elif isinstance(d, str) and d >= since:
+                    if (isinstance(d, datetime) and d >= since_dt) or (
+                        isinstance(d, str) and d >= since
+                    ):
                         filtered.append(c)
                 corrections = filtered
             except ValueError:
@@ -238,16 +247,19 @@ def create_app(config_path: Path) -> FastAPI:
         corr_id = next_id(corrections, "corr")
         now = datetime.now(timezone.utc)
 
-        correction: dict[str, Any] = {
-            "id": corr_id,
-            "subject": body.subject,
-            "date": now,
-            "protocol_version": config.protocol_version,
-            "step": body.step,
-            "protocol_output": body.protocol_output,
-            "correct_output": body.correct_output,
-            "reasoning": body.reasoning,
-        }
+        correction: Correction = cast(
+            Correction,
+            {
+                "id": corr_id,
+                "subject": body.subject,
+                "date": now,
+                "protocol_version": config.protocol_version,
+                "step": body.step,
+                "protocol_output": body.protocol_output,
+                "correct_output": body.correct_output,
+                "reasoning": body.reasoning,
+            },
+        )
         if body.rule:
             correction["rule"] = body.rule
 
@@ -294,10 +306,12 @@ def create_app(config_path: Path) -> FastAPI:
         if proto_path.is_dir():
             modules = []
             for f in sorted(proto_path.glob("*.md")):
-                modules.append({
-                    "name": f.name,
-                    "content": f.read_text(),
-                })
+                modules.append(
+                    {
+                        "name": f.name,
+                        "content": f.read_text(),
+                    }
+                )
             return {
                 "path": str(config.protocol_path),
                 "version": config.protocol_version,
@@ -326,11 +340,13 @@ def create_app(config_path: Path) -> FastAPI:
         for f in sorted(versions_dir.iterdir()):
             if f.is_file() and f.suffix == ".md":
                 mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
-                result.append({
-                    "version": f.stem,
-                    "filename": f.name,
-                    "modified": mtime.isoformat(),
-                })
+                result.append(
+                    {
+                        "version": f.stem,
+                        "filename": f.name,
+                        "modified": mtime.isoformat(),
+                    }
+                )
         return result
 
     # -------------------------------------------------------------------
@@ -382,7 +398,9 @@ def create_app(config_path: Path) -> FastAPI:
     def post_promote(version: str = Query(...)):
         config = _config()
         staged_dir = config.root / "resynthesis"
-        staged_files = list(staged_dir.glob("staged-*.md")) if staged_dir.exists() else []
+        staged_files = (
+            list(staged_dir.glob("staged-*.md")) if staged_dir.exists() else []
+        )
         if not staged_files:
             raise HTTPException(status_code=404, detail="No staged resynthesis found")
 
@@ -402,7 +420,7 @@ def create_app(config_path: Path) -> FastAPI:
         import tomli_w
 
         config_file = app.state.config_path
-        with open(config_file, "rb") as f:
+        with config_file.open("rb") as f:
             data = tomllib.load(f)
 
         triggers = data.setdefault("resynthesis", {}).setdefault("triggers", {})
@@ -754,7 +772,10 @@ connectSSE();
 # Server runner
 # ---------------------------------------------------------------------------
 
-def run_server(config_path: Path, host: str = "127.0.0.1", port: int = DEFAULT_PORT) -> None:
+
+def run_server(
+    config_path: Path, host: str = "127.0.0.1", port: int = DEFAULT_PORT
+) -> None:
     """Create the app and run it with uvicorn."""
     import uvicorn
 

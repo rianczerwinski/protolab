@@ -6,7 +6,6 @@ and rule files, and the default resynthesis prompt template.
 
 from __future__ import annotations
 
-import glob as globmod
 import logging
 from pathlib import Path
 
@@ -87,10 +86,10 @@ def scaffold_project(bare: bool = False) -> None:
                 f"Create it before running other commands."
             )
     else:
-        # Glob for likely protocol files
-        candidates = []
+        # Glob for likely protocol files relative to current directory
+        candidates: list[str] = []
         for pattern in PROTOCOL_GLOBS:
-            candidates.extend(globmod.glob(pattern))
+            candidates.extend(str(p.relative_to(cwd)) for p in cwd.glob(pattern))
         candidates = sorted(set(candidates))
 
         if candidates:

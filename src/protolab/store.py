@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -26,15 +27,15 @@ logger = logging.getLogger(__name__)
 ID_PAD_WIDTH = 3  # zero-pad width for generated IDs (corr_001, rule_042)
 
 
-def load_toml(path: Path) -> dict:
+def load_toml(path: Path) -> dict[str, Any]:
     """Load a TOML file and return its contents as a dict.
 
     Empty files (0 bytes) return ``{}``. Non-empty files that fail to parse
     raise ``ValueError`` with the file path for diagnostics.
     """
     try:
-        with open(path, "rb") as f:
-            data = tomllib.load(f)
+        with path.open("rb") as f:
+            data: dict[str, Any] = tomllib.load(f)
         logger.debug("Loaded %s (%d top-level keys)", path, len(data))
         return data
     except tomllib.TOMLDecodeError:
@@ -42,12 +43,11 @@ def load_toml(path: Path) -> dict:
             logger.debug("Empty file %s — returning {}", path)
             return {}
         raise ValueError(
-            f"Failed to parse TOML file '{path}'. "
-            f"Check for syntax errors."
+            f"Failed to parse TOML file '{path}'. Check for syntax errors."
         )
 
 
-def save_toml(path: Path, data: dict) -> None:
+def save_toml(path: Path, data: dict[str, Any]) -> None:
     """Write a dict to a TOML file, creating parent directories as needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(tomli_w.dumps(data))
@@ -60,7 +60,7 @@ def load_corrections(config: Config) -> list[Correction]:
     if not path.exists():
         return []
     data = load_toml(path)
-    return data.get("corrections", [])
+    return cast(list[Correction], data.get("corrections", []))
 
 
 def save_corrections(config: Config, corrections: list[Correction]) -> None:
@@ -75,7 +75,7 @@ def load_rules(config: Config) -> list[Rule]:
     if not path.exists():
         return []
     data = load_toml(path)
-    return data.get("rules", [])
+    return cast(list[Rule], data.get("rules", []))
 
 
 def save_rules(config: Config, rules: list[Rule]) -> None:
@@ -84,7 +84,7 @@ def save_rules(config: Config, rules: list[Rule]) -> None:
     save_toml(path, {"rules": rules})
 
 
-def next_id(existing: list[dict], prefix: str) -> str:
+def next_id(existing: list[Any], prefix: str) -> str:
     """Generate the next sequential ID (e.g. ``corr_001``, ``rule_042``).
 
     Scans existing items for the highest numeric suffix and increments.

@@ -36,8 +36,7 @@ def test_cluster_unmet(sample_config):
     """2/10 on same step, threshold 0.30 — unmet."""
     # 10 corrections spread evenly across 5 steps (2 each = 0.20)
     corrections = [
-        {"id": f"corr_{i:03d}", "step": f"step_{i % 5}"}
-        for i in range(1, 11)
+        {"id": f"corr_{i:03d}", "step": f"step_{i % 5}"} for i in range(1, 11)
     ]
     results = evaluate_triggers(sample_config, corrections, [])
     assert _find(results, "cluster_threshold").met is False
@@ -58,7 +57,9 @@ def test_preventable_met(sample_config, sample_corrections, sample_rules):
 
 def test_days_met(sample_config):
     """Last resynthesis 31 days ago, threshold 30 — met."""
-    sample_config.last_resynthesis_date = datetime.now(timezone.utc) - timedelta(days=31)
+    sample_config.last_resynthesis_date = datetime.now(timezone.utc) - timedelta(
+        days=31
+    )
     results = evaluate_triggers(sample_config, [], [])
     assert _find(results, "max_days_since_resynthesis").met is True
 
@@ -81,10 +82,17 @@ def test_malformed_correction_skipped(sample_config):
     corrections = [
         {"id": "corr_001"},  # missing step and date
         {"id": "corr_002", "step": "a"},  # missing date
-        {"id": "corr_003", "step": "a", "date": datetime(2026, 3, 22, tzinfo=timezone.utc)},
+        {
+            "id": "corr_003",
+            "step": "a",
+            "date": datetime(2026, 3, 22, tzinfo=timezone.utc),
+        },
     ]
     rules = [
-        {"decision_point": "a", "date_added": datetime(2026, 3, 20, tzinfo=timezone.utc)},
+        {
+            "decision_point": "a",
+            "date_added": datetime(2026, 3, 20, tzinfo=timezone.utc),
+        },
     ]
     results = evaluate_triggers(sample_config, corrections, rules)
     # Should not crash — preventable count should only count corr_003

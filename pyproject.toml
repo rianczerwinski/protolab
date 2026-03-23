@@ -30,12 +30,13 @@ dependencies = [
     "rich>=13.0",
     "tomli-w>=1.0",
     "tomli>=2.0; python_version < '3.11'",
+    "typing_extensions>=4.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
 ai = ["anthropic>=0.39.0"]
 serve = ["fastapi>=0.100.0", "uvicorn[standard]>=0.20.0"]
-dev = ["pytest>=7.0", "pytest-tmp-files>=0.0.2", "httpx>=0.24.0"]
+dev = ["pytest>=7.0", "pytest-tmp-files>=0.0.2", "httpx>=0.24.0", "ruff>=0.15", "mypy>=1.9"]
 
 [project.scripts]
 protolab = "protolab.cli:main"
@@ -51,3 +52,47 @@ packages = ["src/protolab"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes (unused imports, undefined names)
+    "I",    # isort (import order)
+    "N",    # pep8-naming
+    "UP",   # pyupgrade (use modern syntax)
+    "B",    # flake8-bugbear (common footguns)
+    "S",    # flake8-bandit (security)
+    "RUF",  # ruff-specific rules
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "PTH",  # flake8-use-pathlib (prefer Path over os.path)
+]
+ignore = [
+    "S101",  # assert is fine in tests
+    "B904",  # raise-from inside except — stylistic choice
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S106", "E501"]  # test verbosity and long fixture signatures are acceptable
+"src/protolab/init_cmd.py" = ["E501"]  # long lines are template content, not code
+"src/protolab/serve.py" = ["E501"]     # long lines are HTML/CSS/SSE template content
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# FastAPI route handlers use runtime reflection; SSE generators and HTML content
+# make strict annotations a maintenance burden without safety benefit.
+# Correctness is enforced by the test suite (test_serve.py).
+module = "protolab.serve"
+ignore_errors = true

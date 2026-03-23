@@ -62,10 +62,7 @@ def analyze_corrections(
     # Build clusters
     clusters: list[StepCluster] = []
     for step, step_corrections in by_step.items():
-        step_rules = [
-            r for r in rules
-            if r.get("decision_point") == step
-        ]
+        step_rules = [r for r in rules if r.get("decision_point") == step]
 
         # Count preventable: corrections that occurred after a matching rule
         # was established. One matching rule is enough — break avoids
@@ -81,20 +78,25 @@ def analyze_corrections(
                     preventable += 1
                     break
 
-        clusters.append(StepCluster(
-            step=step,
-            count=len(step_corrections),
-            percentage=len(step_corrections) / total * 100,
-            corrections=step_corrections,
-            rules=step_rules,
-            preventable_count=preventable,
-        ))
+        clusters.append(
+            StepCluster(
+                step=step,
+                count=len(step_corrections),
+                percentage=len(step_corrections) / total * 100,
+                corrections=step_corrections,
+                rules=step_rules,
+                preventable_count=preventable,
+            )
+        )
 
     clusters.sort(key=lambda c: c.count, reverse=True)
 
     logger.debug(
         "Analysis: %d corrections, %d steps, top cluster '%s' (%d)",
-        total, len(clusters), clusters[0].step, clusters[0].count,
+        total,
+        len(clusters),
+        clusters[0].step,
+        clusters[0].count,
     )
 
     return AnalysisResult(

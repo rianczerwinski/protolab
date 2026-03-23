@@ -13,6 +13,7 @@ import logging
 import warnings
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from .config import Config
 from .store import load_corrections, next_id
@@ -40,9 +41,7 @@ def import_eval_failures(
     elif suffix == ".csv":
         rows = _read_csv(path)
     else:
-        raise ValueError(
-            f"Unsupported import format '{suffix}'. Use .jsonl or .csv."
-        )
+        raise ValueError(f"Unsupported import format '{suffix}'. Use .jsonl or .csv.")
 
     existing = load_corrections(config)
     stubs: list[Correction] = []
@@ -80,25 +79,29 @@ def import_eval_failures(
             continue
 
         corr_id = next_id(existing + stubs, "corr")
-        stubs.append({
-            "id": corr_id,
-            "subject": mapped["subject"],
-            "date": datetime.now(timezone.utc),
-            "protocol_version": config.protocol_version,
-            "step": mapped["step"],
-            "protocol_output": mapped["protocol_output"],
-            "correct_output": "TODO",
-            "reasoning": "TODO",
-        })
+        stubs.append(
+            {
+                "id": corr_id,
+                "subject": mapped["subject"],
+                "date": datetime.now(timezone.utc),
+                "protocol_version": config.protocol_version,
+                "step": mapped["step"],
+                "protocol_output": mapped["protocol_output"],
+                "correct_output": "TODO",
+                "reasoning": "TODO",
+            }
+        )
 
-    logger.debug("Imported %d stubs, skipped %d rows from %s", len(stubs), skipped, path)
+    logger.debug(
+        "Imported %d stubs, skipped %d rows from %s", len(stubs), skipped, path
+    )
     return stubs, skipped
 
 
-def _read_jsonl(path: Path) -> list[dict]:
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     """Read a JSONL file — one JSON object per line."""
-    rows: list[dict] = []
-    with open(path) as f:
+    rows: list[dict[str, Any]] = []
+    with path.open() as f:
         for line in f:
             line = line.strip()
             if line:
@@ -106,8 +109,8 @@ def _read_jsonl(path: Path) -> list[dict]:
     return rows
 
 
-def _read_csv(path: Path) -> list[dict]:
+def _read_csv(path: Path) -> list[dict[str, Any]]:
     """Read a CSV file with a header row."""
-    with open(path, newline="") as f:
+    with path.open(newline="") as f:
         reader = csv.DictReader(f)
         return list(reader)

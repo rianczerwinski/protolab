@@ -39,6 +39,6 @@ def call_anthropic(model: str, api_key: str, prompt: str) -> str:
     if not response.content:
         raise RuntimeError("LLM returned empty response.")
 
-    text = response.content[0].text
+    text = str(response.content[0].text)  # content[0].text is Any from the SDK
     logger.debug("Response received (%d chars)", len(text))
     return text

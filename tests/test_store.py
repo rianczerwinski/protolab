@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from protolab.store import (
     load_corrections,
@@ -18,7 +18,7 @@ def test_roundtrip(sample_config, sample_corrections):
     save_corrections(sample_config, sample_corrections)
     loaded = load_corrections(sample_config)
     assert len(loaded) == len(sample_corrections)
-    for orig, loaded_item in zip(sample_corrections, loaded):
+    for orig, loaded_item in zip(sample_corrections, loaded, strict=True):
         assert orig["id"] == loaded_item["id"]
         assert orig["subject"] == loaded_item["subject"]
         assert orig["step"] == loaded_item["step"]
@@ -77,6 +77,7 @@ def test_malformed_toml_raises(tmp_path):
     bad_file = tmp_path / "bad.toml"
     bad_file.write_text("this is not [valid toml\n")
     import pytest
+
     with pytest.raises(ValueError, match="Failed to parse TOML"):
         load_toml(bad_file)
 

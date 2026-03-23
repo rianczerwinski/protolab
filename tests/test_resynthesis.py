@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 from protolab.analyze import analyze_corrections
 from protolab.config import load_config
 from protolab.resynthesis import assemble_prompt, promote_resynthesis, stage_resynthesis
@@ -64,7 +62,9 @@ def test_rules_grouped(tmp_project, sample_config, sample_corrections, sample_ru
     assert f"STRONG: {strong_rule['rule']}" in result
 
 
-def test_analysis_included(tmp_project, sample_config, sample_corrections, sample_rules):
+def test_analysis_included(
+    tmp_project, sample_config, sample_corrections, sample_rules
+):
     """Analysis summary appears in rendered prompt."""
     protocol_content = "test"
     analysis = analyze_corrections(sample_corrections, sample_rules)
@@ -88,7 +88,9 @@ def test_staging(tmp_project, sample_config):
     assert "Test Protocol" in original
 
 
-def test_promote_archives_protocol(tmp_project, sample_config, sample_corrections, sample_rules):
+def test_promote_archives_protocol(
+    tmp_project, sample_config, sample_corrections, sample_rules
+):
     """After promote, archive contains old version."""
     save_corrections(sample_config, sample_corrections)
     save_rules(sample_config, sample_rules)
@@ -99,7 +101,9 @@ def test_promote_archives_protocol(tmp_project, sample_config, sample_correction
     assert "Test Protocol" in archive.read_text()
 
 
-def test_promote_clears_logs(tmp_project, sample_config, sample_corrections, sample_rules):
+def test_promote_clears_logs(
+    tmp_project, sample_config, sample_corrections, sample_rules
+):
     """Correction and rule files reset to empty after promote."""
     save_corrections(sample_config, sample_corrections)
     save_rules(sample_config, sample_rules)

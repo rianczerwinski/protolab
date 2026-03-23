@@ -7,7 +7,6 @@ using rich panels and tables.
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime
 
 from rich.console import Console
@@ -37,21 +36,26 @@ def render_status(config: Config, console: Console | None = None) -> None:
     protocol_file = config.root / config.protocol_path
     mod_time = ""
     if protocol_file.exists():
-        mtime = os.path.getmtime(protocol_file)
+        mtime = protocol_file.stat().st_mtime
         mod_time = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
-    console.print(Panel(
-        f"[bold]Path:[/bold] {config.protocol_path}\n"
-        f"[bold]Version:[/bold] {config.protocol_version}\n"
-        f"[bold]Last modified:[/bold] {mod_time}",
-        title="Protocol",
-    ))
+    console.print(
+        Panel(
+            f"[bold]Path:[/bold] {config.protocol_path}\n"
+            f"[bold]Version:[/bold] {config.protocol_version}\n"
+            f"[bold]Last modified:[/bold] {mod_time}",
+            title="Protocol",
+        )
+    )
 
     # Corrections summary
     if corrections:
         dates = [c["date"] for c in corrections if isinstance(c.get("date"), datetime)]
         oldest = min(dates).strftime("%Y-%m-%d") if dates else "?"
         newest = max(dates).strftime("%Y-%m-%d") if dates else "?"
-        console.print(f"\n[bold]Corrections:[/bold] {len(corrections)} (oldest: {oldest}, newest: {newest})")
+        console.print(
+            f"\n[bold]Corrections:[/bold] {len(corrections)} "
+            f"(oldest: {oldest}, newest: {newest})"
+        )
     else:
         console.print("\n[bold]Corrections:[/bold] 0")
 
@@ -73,7 +77,7 @@ def render_status(config: Config, console: Console | None = None) -> None:
 
     # Rules by confidence
     if rules:
-        counts = {level: 0 for level in CONFIDENCE_LEVELS}
+        counts = dict.fromkeys(CONFIDENCE_LEVELS, 0)
         for r in rules:
             conf = r.get("confidence", "provisional")
             if conf in counts:
@@ -95,7 +99,10 @@ def render_status(config: Config, console: Console | None = None) -> None:
         for t in triggers:
             status_str = "[green]met[/green]" if t.met else "[dim]unmet[/dim]"
             trigger_table.add_row(
-                t.name, status_str, str(t.current_value), str(t.threshold),
+                t.name,
+                status_str,
+                str(t.current_value),
+                str(t.threshold),
             )
         console.print(trigger_table)
 
