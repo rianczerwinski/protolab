@@ -7,7 +7,7 @@ path = "corrections.toml"
 rules_path = "rules.toml"
 
 [resynthesis]
-prompt_template = "resynthesis-prompt.md"
+prompt_template = "../../resynthesis-prompt-template.md"
 output_path = "resynthesis-prompt.md"
 
 [resynthesis.triggers]

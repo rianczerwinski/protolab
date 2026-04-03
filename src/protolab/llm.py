@@ -6,19 +6,11 @@ this module grows a provider abstraction; nothing else changes.
 
 from __future__ import annotations
 
-import logging
-
-logger = logging.getLogger(__name__)
-
-DEFAULT_MAX_TOKENS = 8192
-
 
 def call_anthropic(model: str, api_key: str, prompt: str) -> str:
-    """Call the Anthropic messages API and return the response text.
+    """Call Anthropic messages API. Return response text.
 
-    Raises ``ImportError`` with install instructions if the ``anthropic``
-    package is not available. Raises ``RuntimeError`` if the API returns
-    an empty response.
+    Raises clear error if anthropic package not installed.
     """
     try:
         import anthropic
@@ -28,17 +20,12 @@ def call_anthropic(model: str, api_key: str, prompt: str) -> str:
             "Install it with: pip install protolab[ai]"
         )
 
-    logger.debug("Calling %s (prompt length: %d chars)", model, len(prompt))
-
     client = anthropic.Anthropic(api_key=api_key)
     response = client.messages.create(
         model=model,
-        max_tokens=DEFAULT_MAX_TOKENS,
+        max_tokens=8192,
         messages=[{"role": "user", "content": prompt}],
     )
     if not response.content:
         raise RuntimeError("LLM returned empty response.")
-
-    text = str(response.content[0].text)  # content[0].text is Any from the SDK
-    logger.debug("Response received (%d chars)", len(text))
-    return text
+    return response.content[0].text

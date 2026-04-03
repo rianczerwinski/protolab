@@ -72,33 +72,6 @@ protolab import eval-results.jsonl --subject-field=input --output-field=expected
 
 Then fill in the reasoning with `protolab correct`.
 
-## Web Dashboard
-
-Protolab includes an optional HTTP server with a live-updating dashboard and JSON API.
-
-```bash
-pip install protolab[serve]
-protolab serve              # http://localhost:8080
-protolab serve --port 9090  # custom port
-```
-
-The dashboard shows correction stream, trigger gauges, cluster analysis, and
-editable configuration — all live-updating via SSE when corrections are added
-(from the CLI or via the API).
-
-**API endpoints:**
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/status` | Full status (corrections, clusters, rules, triggers) |
-| GET | `/api/corrections` | List corrections (`?step=`, `?since=`) |
-| POST | `/api/corrections` | Log a correction via JSON |
-| GET | `/api/triggers` | Trigger evaluation results |
-| GET | `/api/protocol` | Protocol content (file or module directory) |
-| POST | `/api/resynthesis` | Assemble prompt (`?run=true` to execute) |
-| PATCH | `/api/config` | Update trigger thresholds |
-| GET | `/api/events` | SSE stream (live updates) |
-
 ## Docs
 
 - [Concepts](docs/concepts.md) — The compression insight and refinement methodology
@@ -107,11 +80,6 @@ editable configuration — all live-updating via SSE when corrections are added
 - [Resynthesis](docs/resynthesis.md) — Prompt design and template customization
 - [Integration](docs/integration.md) — Eval frameworks, CI/CD, team workflows
 
-### Internal
-
-- [Spec](docs/internal/spec.md) — Implementation specification
-- [Architecture](docs/internal/architecture.md) — Vision, design philosophy, refinement cycle theory
-
 ## License
 
-MIT
+MIT. See [TRADEMARK.md](TRADEMARK.md) for trademark notice.

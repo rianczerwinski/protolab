@@ -1,13 +1,7 @@
-"""Click CLI group and all commands.
-
-The ``--verbose`` flag on the group configures Python logging. Library
-modules use ``logging.getLogger(__name__)`` — output is silent by default
-and enabled with ``protolab -v <command>``.
-"""
+"""Click CLI group and all commands."""
 
 from __future__ import annotations
 
-import logging
 import sys
 from pathlib import Path
 
@@ -18,16 +12,11 @@ from rich.table import Table
 
 from .analyze import analyze_corrections
 from .check import evaluate_triggers
-from .config import load_config, load_protocol_text
+from .config import load_config
 from .correct import batch_correct, extract_rule, interactive_correct
 from .import_cmd import import_eval_failures
 from .init_cmd import scaffold_project
-from .resynthesis import (
-    assemble_prompt,
-    promote_resynthesis,
-    run_resynthesis,
-    stage_resynthesis,
-)
+from .resynthesis import assemble_prompt, promote_resynthesis, run_resynthesis, stage_resynthesis
 from .status import render_status
 from .store import load_corrections, load_rules, save_corrections, save_rules
 
@@ -35,12 +24,7 @@ console = Console()
 
 
 def _version_increment(version: str) -> str:
-    """Auto-increment a dotted version string.
-
-    Splits on ``"."``, increments the last numeric segment.
-    ``"v1.0"`` -> ``"v1.1"``, ``"v2.3.1"`` -> ``"v2.3.2"``.
-    Returns the input unchanged if the last segment is non-numeric.
-    """
+    """Auto-increment version: v1.0 -> v1.1, v2.3.1 -> v2.3.2."""
     parts = version.split(".")
     try:
         parts[-1] = str(int(parts[-1]) + 1)
@@ -50,16 +34,13 @@ def _version_increment(version: str) -> str:
 
 
 @click.group()
-@click.option("-v", "--verbose", is_flag=True, help="Enable debug logging")
-def main(verbose: bool) -> None:
+def main():
     """Protolab: error-driven compression for protocol documents."""
-    level = logging.DEBUG if verbose else logging.WARNING
-    logging.basicConfig(level=level, format="%(name)s: %(message)s")
 
 
 @main.command()
 @click.option("--bare", is_flag=True, help="Non-interactive, all defaults")
-def init(bare: bool) -> None:
+def init(bare):
     """Initialize a protolab project in the current directory."""
     try:
         scaffold_project(bare=bare)
@@ -68,10 +49,8 @@ def init(bare: bool) -> None:
 
 
 @main.command()
-@click.option(
-    "--batch", type=click.Path(exists=True), help="Import corrections from file"
-)
-def correct(batch: str | None) -> None:
+@click.option("--batch", type=click.Path(exists=True), help="Import corrections from file")
+def correct(batch):
     """Log a correction to the protocol."""
     try:
         config = load_config()
@@ -104,60 +83,35 @@ def correct(batch: str | None) -> None:
             existing_rules = load_rules(config)
             existing_rules.append(rule)
             save_rules(config, existing_rules)
-            console.print(
-                Panel(
-                    f"[bold]Rule {rule['id']}:[/bold] {rule['rule']}",
-                    title="Rule Extracted",
-                )
-            )
+            console.print(Panel(
+                f"[bold]Rule {rule['id']}:[/bold] {rule['rule']}",
+                title="Rule Extracted",
+            ))
 
-        console.print(
-            Panel(
-                f"[bold]{correction['id']}[/bold] — {correction['step']}\n"
-                f"Subject: {correction['subject']}\n"
-                f"Protocol said: {correction['protocol_output']}\n"
-                f"Correct: {correction['correct_output']}",
-                title="Correction Logged",
-            )
-        )
+        console.print(Panel(
+            f"[bold]{correction['id']}[/bold] — {correction['step']}\n"
+            f"Subject: {correction['subject']}\n"
+            f"Protocol said: {correction['protocol_output']}\n"
+            f"Correct: {correction['correct_output']}",
+            title="Correction Logged",
+        ))
 
 
 @main.command("import")
 @click.argument("path", type=click.Path(exists=True))
-@click.option(
-    "--from",
-    "adapter_name",
-    default="auto",
-    help="Adapter: promptfoo, braintrust, auto, or a custom name from config",
-)
-@click.option("--subject-field", default="subject", help="Legacy: subject field name")
-@click.option("--output-field", default="output", help="Legacy: output field name")
-@click.option("--step-field", default="step", help="Legacy: step field name")
-def import_cmd(
-    path: str,
-    adapter_name: str,
-    subject_field: str,
-    output_field: str,
-    step_field: str,
-) -> None:
+@click.option("--subject-field", default="subject")
+@click.option("--output-field", default="output")
+@click.option("--step-field", default="step")
+def import_cmd(path, subject_field, output_field, step_field):
     """Import eval failures as correction stubs."""
     try:
         config = load_config()
     except FileNotFoundError as e:
         raise click.ClickException(str(e))
 
-    try:
-        stubs, skipped = import_eval_failures(
-            config,
-            Path(path),
-            adapter_name=adapter_name,
-            subject_field=subject_field,
-            output_field=output_field,
-            step_field=step_field,
-        )
-    except ValueError as e:
-        raise click.ClickException(str(e))
-
+    stubs, skipped = import_eval_failures(
+        config, Path(path), subject_field, output_field, step_field,
+    )
     existing = load_corrections(config)
     existing.extend(stubs)
     save_corrections(config, existing)
@@ -169,7 +123,7 @@ def import_cmd(
 
 
 @main.command()
-def check() -> None:
+def check():
     """Evaluate resynthesis triggers."""
     try:
         config = load_config()
@@ -196,19 +150,12 @@ def check() -> None:
     console.print(table)
 
     if any_met:
-        console.print(
-            "\n[bold]Resynthesis recommended.[/bold] Run `protolab resynthesis`"
-        )
+        console.print("\n[bold]Resynthesis recommended.[/bold] Run `protolab resynthesis`")
         sys.exit(1)
 
 
 @main.command()
-@click.option(
-    "--group-by",
-    default="step",
-    help="Field to group by (default: step). Dot-path for metadata.",
-)
-def analyze(group_by: str) -> None:
+def analyze():
     """Cluster analysis of accumulated corrections."""
     try:
         config = load_config()
@@ -217,7 +164,7 @@ def analyze(group_by: str) -> None:
 
     corrections = load_corrections(config)
     rules = load_rules(config)
-    result = analyze_corrections(corrections, rules, group_by=group_by)
+    result = analyze_corrections(corrections, rules)
 
     if not result.clusters:
         console.print("No corrections to analyze.")
@@ -256,7 +203,7 @@ def analyze(group_by: str) -> None:
 
 @main.command()
 @click.option("--run", is_flag=True, help="Execute via LLM API")
-def resynthesis(run: bool) -> None:
+def resynthesis(run):
     """Assemble resynthesis prompt, optionally execute via LLM."""
     try:
         config = load_config()
@@ -266,7 +213,7 @@ def resynthesis(run: bool) -> None:
     corrections = load_corrections(config)
     rules = load_rules(config)
     analysis = analyze_corrections(corrections, rules)
-    protocol_content = load_protocol_text(config)
+    protocol_content = (config.root / config.protocol_path).read_text()
 
     prompt = assemble_prompt(config, protocol_content, corrections, rules, analysis)
 
@@ -308,7 +255,7 @@ def resynthesis(run: bool) -> None:
 
 
 @main.command()
-def status() -> None:
+def status():
     """Dashboard showing protocol, corrections, rules, and trigger status."""
     try:
         config = load_config()
@@ -316,81 +263,3 @@ def status() -> None:
         raise click.ClickException(str(e))
 
     render_status(config, console)
-
-
-@main.command()
-@click.option("--port", default=8080, help="Port to listen on")
-@click.option("--host", default="127.0.0.1", help="Host to bind to")
-def serve(port: int, host: str) -> None:
-    """Start the protolab HTTP server and web dashboard."""
-    try:
-        from .serve import run_server
-    except ImportError:
-        raise click.ClickException(
-            "The 'serve' extra is required. Install with: pip install protolab[serve]"
-        )
-    try:
-        load_config()  # validate config exists before starting the server
-    except FileNotFoundError as e:
-        raise click.ClickException(str(e))
-
-    config_path = Path.cwd() / "protolab.toml"
-    console.print(f"Starting protolab server on http://{host}:{port}")
-    run_server(config_path, host, port)
-
-
-@main.command()
-def adapters() -> None:
-    """List available import adapters."""
-    from .adapters import _REGISTRY
-
-    # Built-in
-    console.print("[bold]Built-in:[/bold]")
-    for name in sorted(_REGISTRY):
-        adapter_cls = _REGISTRY[name]
-        fmts = ", ".join(adapter_cls.formats)
-        console.print(f"  {name:15s} {fmts}")
-
-    # Custom from config
-    try:
-        config = load_config()
-        if config.import_schemas:
-            console.print("\n[bold]Custom (from protolab.toml):[/bold]")
-            for name, schema in config.import_schemas.items():
-                console.print(f"  {name:15s} {schema.format}")
-    except FileNotFoundError:
-        pass
-
-
-@main.command()
-@click.option(
-    "--format",
-    "fmt",
-    default="raw",
-    type=click.Choice(["raw", "promptfoo"]),
-    help="Export format",
-)
-@click.option("--output", "-o", type=click.Path(), help="Output path")
-def export(fmt: str, output: str | None) -> None:
-    """Export the current protocol in a framework-friendly format."""
-    try:
-        config = load_config()
-    except FileNotFoundError as e:
-        raise click.ClickException(str(e))
-
-    from .adapters.export import export_promptfoo, export_raw
-    from .config import load_protocol_text
-
-    protocol_text = load_protocol_text(config)
-
-    if fmt == "promptfoo":
-        result = export_promptfoo(config, protocol_text)
-        if output:
-            Path(output).write_text(result)
-            console.print(f"Exported Promptfoo config to {output}")
-        else:
-            console.print(result)
-    else:
-        out_path = Path(output) if output else config.root / "deploy" / "protocol.md"
-        export_raw(config, protocol_text, out_path)
-        console.print(f"Exported protocol to {out_path}")

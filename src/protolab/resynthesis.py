@@ -1,46 +1,28 @@
-"""protolab resynthesis — prompt assembly and LLM execution.
-
-Handles the full resynthesis lifecycle: assembling the Jinja2 prompt,
-sending it to an LLM, staging the result, and promoting it to the
-active protocol (with archiving and config updates).
-"""
+"""protolab resynthesis — prompt assembly and LLM execution."""
 
 from __future__ import annotations
 
-import logging
 import os
 import shutil
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 import jinja2
 import tomli_w
 
-from . import llm
 from .analyze import AnalysisResult
 from .config import Config
-from .types import Correction, Rule
-
-logger = logging.getLogger(__name__)
+from . import llm
 
 
 def assemble_prompt(
     config: Config,
     protocol_content: str,
-    corrections: list[Correction],
-    rules: list[Rule],
+    corrections: list[dict],
+    rules: list[dict],
     analysis: AnalysisResult,
 ) -> str:
-    """Render the Jinja2 resynthesis template with all accumulated data.
-
-    Raises ``FileNotFoundError`` if the configured template file is missing.
-    """
+    """Render Jinja2 template with all data. Return prompt string."""
     template_path = config.root / config.prompt_template_path
     if not template_path.exists():
         raise FileNotFoundError(
@@ -49,7 +31,6 @@ def assemble_prompt(
             f"`resynthesis.prompt_template` in protolab.toml."
         )
     template_text = template_path.read_text()
-    logger.debug("Loaded template from %s", template_path)
 
     # Build analysis summary string
     lines = [
@@ -67,13 +48,14 @@ def assemble_prompt(
                 f"  {top.preventable_count} occurred after rules were "
                 f"established for this step"
             )
-    lines.append(f"Concentration ratio: {analysis.concentration_ratio:.2f}")
+    lines.append(
+        f"Concentration ratio: {analysis.concentration_ratio:.2f}"
+    )
     analysis_summary = "\n".join(lines)
 
     env = jinja2.Environment(
         loader=jinja2.BaseLoader(),
         undefined=jinja2.StrictUndefined,
-        autoescape=False,  # rendering Markdown/plain text, not HTML  # noqa: S701
     )
     template = env.from_string(template_text)
     return template.render(
@@ -86,31 +68,31 @@ def assemble_prompt(
 
 
 def run_resynthesis(config: Config, prompt: str) -> str:
-    """Send the assembled prompt to the configured LLM and return its response."""
+    """Send prompt to LLM via llm.py. Return response text."""
     api_key = os.environ.get(config.llm_api_key_env)
     if not api_key:
         raise RuntimeError(
-            f"API key not found. Set the {config.llm_api_key_env} environment variable."
+            f"API key not found. Set the {config.llm_api_key_env} "
+            f"environment variable."
         )
     return llm.call_anthropic(config.llm_model, api_key, prompt)
 
 
 def stage_resynthesis(config: Config, new_protocol: str) -> Path:
-    """Write the LLM's output to a staging path (not the active protocol)."""
+    """Write to staging path. Return path."""
     staging_dir = config.root / config.resynthesis_output_path.parent
     staging_dir.mkdir(parents=True, exist_ok=True)
     staging_path = staging_dir / "staged-protocol.md"
     staging_path.write_text(new_protocol)
-    logger.debug("Staged resynthesis at %s", staging_path)
     return staging_path
 
 
 def promote_resynthesis(config: Config, staged_path: Path, new_version: str) -> None:
-    """Promote a staged resynthesis to the active protocol.
+    """Archive current, move staged to active, update config, clear logs.
 
-    Operation order minimizes corruption risk if the process is
-    interrupted: archive first, clear logs, then move the protocol
-    file last (the visible "commit"). Config update is final.
+    Operation order is designed so that the protocol file (the most visible
+    artifact) is the last thing changed — if the process is interrupted,
+    the worst case is stale correction logs, not a missing protocol.
     """
     archive_dir = config.root / config.archive_versions_path
     archive_dir.mkdir(parents=True, exist_ok=True)
@@ -143,24 +125,25 @@ def promote_resynthesis(config: Config, staged_path: Path, new_version: str) -> 
     # 5. Update config file
     _update_config_toml(config, new_version)
 
-    logger.info(
-        "Promoted %s -> %s (archived to %s)",
-        config.protocol_version,
-        new_version,
-        archive_dir,
-    )
-
 
 def _update_config_toml(config: Config, new_version: str) -> None:
-    """Update protolab.toml with new version and resynthesis timestamp."""
+    """Update protolab.toml with new version and resynthesis date."""
+    import sys
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        import tomli as tomllib
+
     config_path = config.root / "protolab.toml"
-    with config_path.open("rb") as f:
+    with open(config_path, "rb") as f:
         data = tomllib.load(f)
 
+    # Update version
     if "protocol" not in data:
         data["protocol"] = {}
     data["protocol"]["version"] = new_version
 
+    # Update resynthesis date
     if "resynthesis" not in data:
         data["resynthesis"] = {}
     data["resynthesis"]["last_resynthesis_date"] = datetime.now(timezone.utc)

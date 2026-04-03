@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from protolab.init_cmd import scaffold_project
 
 
