@@ -74,6 +74,7 @@ Then fill in the reasoning with `protolab correct`.
 
 ## Docs
 
+- [Roadmap](ROADMAP.md) — Current evolution and the agentic CAPA design program
 - [Concepts](docs/concepts.md) — The compression insight and refinement methodology
 - [Configuration](docs/configuration.md) — Full `protolab.toml` reference
 - [Correction Schema](docs/correction-schema.md) — Correction and rule field reference
