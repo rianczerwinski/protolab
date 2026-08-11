@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from protolab.config import Config, TriggerConfig, load_config
+from protolab.config import Config, TriggerConfig, load_config, load_protocol_text
 
 
 def test_defaults(tmp_project):
@@ -26,6 +26,7 @@ def test_defaults(tmp_project):
     assert config.last_resynthesis_date is None
     assert config.llm_provider == "anthropic"
     assert config.llm_model == "claude-sonnet-4-20250514"
+    assert config.import_schemas == {}
 
 
 def test_full_config(tmp_project):
@@ -99,3 +100,124 @@ def test_path_traversal_rejected(tmp_project):
     )
     with pytest.raises(ValueError, match="escapes the project root"):
         load_config(tmp_project / "protolab.toml")
+
+
+def test_custom_import_schema(tmp_project):
+    """A complete custom schema is loaded as an executable contract."""
+    (tmp_project / "protolab.toml").write_text("""\
+[protocol]
+path = "protocol.md"
+
+[import.regression_suite]
+format = "json"
+subject = "case.input"
+protocol_output = "result.output"
+step = "case.category"
+correct_output = "case.expected"
+reasoning = "result.reason"
+filter_field = "result.status"
+filter_value = "failed"
+metadata_fields = ["result.score", "model"]
+""")
+
+    schema = load_config(tmp_project / "protolab.toml").import_schemas[
+        "regression_suite"
+    ]
+    assert schema.format == "json"
+    assert schema.subject == "case.input"
+    assert schema.correct_output == "case.expected"
+    assert schema.filter_field == "result.status"
+    assert schema.filter_value == "failed"
+    assert schema.metadata_fields == ["result.score", "model"]
+
+
+def test_import_schema_requires_all_structural_fields(tmp_project):
+    """Malformed adapter declarations fail at the configuration boundary."""
+    (tmp_project / "protolab.toml").write_text("""\
+[protocol]
+path = "protocol.md"
+
+[import.incomplete]
+subject = "input"
+protocol_output = "output"
+""")
+
+    with pytest.raises(ValueError, match=r"\[import\.incomplete\]\.step"):
+        load_config(tmp_project / "protolab.toml")
+
+
+def test_import_schema_filter_is_a_complete_pair(tmp_project):
+    """A filter cannot silently become inactive because half is missing."""
+    (tmp_project / "protolab.toml").write_text("""\
+[protocol]
+path = "protocol.md"
+
+[import.incomplete_filter]
+subject = "input"
+protocol_output = "output"
+step = "step"
+filter_field = "status"
+""")
+
+    with pytest.raises(ValueError, match="must be set together"):
+        load_config(tmp_project / "protolab.toml")
+
+
+def test_import_schema_rejects_unknown_format(tmp_project):
+    """The configured source format must name a parser Protolab provides."""
+    (tmp_project / "protolab.toml").write_text("""\
+[protocol]
+path = "protocol.md"
+
+[import.xml_feed]
+format = "xml"
+subject = "input"
+protocol_output = "output"
+step = "step"
+""")
+
+    with pytest.raises(ValueError, match="jsonl, csv, json"):
+        load_config(tmp_project / "protolab.toml")
+
+
+def test_import_schema_rejects_reserved_name(tmp_project):
+    """A custom schema cannot be declared under an unreachable built-in name."""
+    (tmp_project / "protolab.toml").write_text("""\
+[protocol]
+path = "protocol.md"
+
+[import.promptfoo]
+subject = "input"
+protocol_output = "output"
+step = "step"
+""")
+
+    with pytest.raises(ValueError, match="reserved adapter name 'promptfoo'"):
+        load_config(tmp_project / "protolab.toml")
+
+
+def test_import_schema_rejects_unknown_fields(tmp_project):
+    """Schema typos fail visibly instead of becoming decorative configuration."""
+    (tmp_project / "protolab.toml").write_text("""\
+[protocol]
+path = "protocol.md"
+
+[import.typo]
+subject = "input"
+protocol_output = "output"
+step = "step"
+filter = "status == 'failed'"
+""")
+
+    with pytest.raises(ValueError, match=r"unknown field\(s\): filter"):
+        load_config(tmp_project / "protolab.toml")
+
+
+def test_load_protocol_text_preserves_utf8(tmp_project):
+    """The shared protocol loader returns exact UTF-8 source text."""
+    expected = "# Prötocol\n\nDecide with care: λ.\n"
+    (tmp_project / "protocol.md").write_text(expected, encoding="utf-8")
+
+    config = load_config(tmp_project / "protolab.toml")
+
+    assert load_protocol_text(config) == expected

@@ -7,6 +7,7 @@ Uses dot-path field mappings defined in ``[import.<name>]`` sections of
 from __future__ import annotations
 
 import logging
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,7 @@ class GenericAdapter(BaseAdapter):
     def __init__(self, schema: ImportSchema) -> None:
         self.name = "generic"
         self.schema = schema
+        self.formats = (f".{schema.format}",)
 
     def parse(self, path: Path) -> list[CorrectionStub]:
         rows = read_file(path)
@@ -44,7 +46,11 @@ class GenericAdapter(BaseAdapter):
             )
 
             if subject is None or step is None or protocol_output is None:
-                logger.debug("Row %d: missing required field, skipping", i)
+                warnings.warn(
+                    f"Row {i}: custom adapter '{self.name}' could not resolve "
+                    "subject, protocol_output, or step. Skipping.",
+                    stacklevel=2,
+                )
                 skipped += 1
                 continue
 

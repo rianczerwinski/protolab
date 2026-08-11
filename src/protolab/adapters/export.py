@@ -25,7 +25,7 @@ def export_raw(config: Config, protocol_text: str, path: Path) -> None:
         f"<!-- source: {config.protocol_path} -->\n\n"
     )
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(header + protocol_text)
+    path.write_text(header + protocol_text, encoding="utf-8")
     logger.debug("Exported raw protocol to %s", path)
 
 

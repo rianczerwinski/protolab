@@ -12,7 +12,7 @@ from rich.table import Table
 
 from .analyze import analyze_corrections
 from .check import evaluate_triggers
-from .config import load_config
+from .config import Config, load_config, load_protocol_text
 from .correct import batch_correct, extract_rule, interactive_correct
 from .import_cmd import import_eval_failures
 from .init_cmd import scaffold_project
@@ -21,6 +21,14 @@ from .status import render_status
 from .store import load_corrections, load_rules, save_corrections, save_rules
 
 console = Console()
+
+
+def _project_config() -> Config:
+    """Load the current project config as a clean CLI error boundary."""
+    try:
+        return load_config()
+    except (FileNotFoundError, ValueError) as e:
+        raise click.ClickException(str(e)) from e
 
 
 def _version_increment(version: str) -> str:
@@ -52,10 +60,7 @@ def init(bare):
 @click.option("--batch", type=click.Path(exists=True), help="Import corrections from file")
 def correct(batch):
     """Log a correction to the protocol."""
-    try:
-        config = load_config()
-    except FileNotFoundError as e:
-        raise click.ClickException(str(e))
+    config = _project_config()
 
     if batch:
         corrections = batch_correct(config, Path(batch))
@@ -99,19 +104,32 @@ def correct(batch):
 
 @main.command("import")
 @click.argument("path", type=click.Path(exists=True))
-@click.option("--subject-field", default="subject")
-@click.option("--output-field", default="output")
-@click.option("--step-field", default="step")
-def import_cmd(path, subject_field, output_field, step_field):
+@click.option(
+    "--adapter",
+    "--from",
+    "adapter_name",
+    default="auto",
+    show_default=True,
+    help="Built-in adapter, custom [import.<name>] schema, or legacy",
+)
+@click.option("--subject-field", default="subject", help="Legacy field name")
+@click.option("--output-field", default="output", help="Legacy field name")
+@click.option("--step-field", default="step", help="Legacy field name")
+def import_cmd(path, adapter_name, subject_field, output_field, step_field):
     """Import eval failures as correction stubs."""
+    config = _project_config()
     try:
-        config = load_config()
-    except FileNotFoundError as e:
-        raise click.ClickException(str(e))
+        stubs, skipped = import_eval_failures(
+            config,
+            Path(path),
+            subject_field=subject_field,
+            output_field=output_field,
+            step_field=step_field,
+            adapter_name=adapter_name,
+        )
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
 
-    stubs, skipped = import_eval_failures(
-        config, Path(path), subject_field, output_field, step_field,
-    )
     existing = load_corrections(config)
     existing.extend(stubs)
     save_corrections(config, existing)
@@ -125,10 +143,7 @@ def import_cmd(path, subject_field, output_field, step_field):
 @main.command()
 def check():
     """Evaluate resynthesis triggers."""
-    try:
-        config = load_config()
-    except FileNotFoundError as e:
-        raise click.ClickException(str(e))
+    config = _project_config()
 
     corrections = load_corrections(config)
     rules = load_rules(config)
@@ -157,10 +172,7 @@ def check():
 @main.command()
 def analyze():
     """Cluster analysis of accumulated corrections."""
-    try:
-        config = load_config()
-    except FileNotFoundError as e:
-        raise click.ClickException(str(e))
+    config = _project_config()
 
     corrections = load_corrections(config)
     rules = load_rules(config)
@@ -205,22 +217,19 @@ def analyze():
 @click.option("--run", is_flag=True, help="Execute via LLM API")
 def resynthesis(run):
     """Assemble resynthesis prompt, optionally execute via LLM."""
-    try:
-        config = load_config()
-    except FileNotFoundError as e:
-        raise click.ClickException(str(e))
+    config = _project_config()
 
     corrections = load_corrections(config)
     rules = load_rules(config)
     analysis = analyze_corrections(corrections, rules)
-    protocol_content = (config.root / config.protocol_path).read_text()
+    protocol_content = load_protocol_text(config)
 
     prompt = assemble_prompt(config, protocol_content, corrections, rules, analysis)
 
     # Write prompt to output path
     output_path = config.root / config.resynthesis_output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(prompt)
+    output_path.write_text(prompt, encoding="utf-8")
     console.print(f"Resynthesis prompt written to {config.resynthesis_output_path}")
 
     if not run:
@@ -257,9 +266,67 @@ def resynthesis(run):
 @main.command()
 def status():
     """Dashboard showing protocol, corrections, rules, and trigger status."""
-    try:
-        config = load_config()
-    except FileNotFoundError as e:
-        raise click.ClickException(str(e))
+    config = _project_config()
 
     render_status(config, console)
+
+
+@main.command()
+def adapters():
+    """List built-in and project-defined import adapters."""
+    from .adapters import get_adapter, list_adapters
+
+    try:
+        config = load_config()
+    except FileNotFoundError:
+        config = None
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+
+    table = Table(title="Import Adapters")
+    table.add_column("Name")
+    table.add_column("Formats")
+    for name in list_adapters(config):
+        adapter = get_adapter(name, config)
+        table.add_row(name, ", ".join(adapter.formats))
+    console.print(table)
+
+
+@main.command("export")
+@click.argument(
+    "format_arg",
+    required=False,
+    type=click.Choice(["raw", "promptfoo"]),
+)
+@click.option(
+    "--format",
+    "format_option",
+    type=click.Choice(["raw", "promptfoo"]),
+    help="Export format; equivalent to the optional positional format",
+)
+@click.option("--output", "-o", type=click.Path(), help="Destination file")
+def export_cmd(format_arg, format_option, output):
+    """Export the protocol for another tool or deployment target."""
+    if format_arg and format_option and format_arg != format_option:
+        raise click.ClickException(
+            "Positional format and --format must match when both are supplied."
+        )
+    export_format = format_option or format_arg or "raw"
+
+    config = _project_config()
+
+    from .adapters.export import export_promptfoo, export_raw
+
+    protocol_text = load_protocol_text(config)
+    if export_format == "promptfoo":
+        result = export_promptfoo(config, protocol_text)
+        if output:
+            Path(output).write_text(result, encoding="utf-8")
+            console.print(f"Exported Promptfoo config to {output}")
+        else:
+            console.print(result)
+        return
+
+    out_path = Path(output) if output else config.root / "deploy" / "protocol.md"
+    export_raw(config, protocol_text, out_path)
+    console.print(f"Exported protocol to {out_path}")

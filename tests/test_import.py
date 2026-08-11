@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import warnings
 
+from protolab.config import load_config
+
 from protolab.import_cmd import import_eval_failures
 
 
@@ -73,3 +75,47 @@ def test_missing_field(tmp_project, sample_config):
     assert skipped == 1
     assert len(w) == 1  # Warning emitted
     assert "missing field" in str(w[0].message).lower()
+
+
+def test_configured_adapter_imports_nested_records(tmp_project):
+    """A named TOML schema drives nested source ingestion end to end."""
+    (tmp_project / "protolab.toml").write_text("""\
+[protocol]
+path = "protocol.md"
+version = "v2.0"
+
+[import.eval_lab]
+format = "jsonl"
+subject = "case.input"
+protocol_output = "result.actual"
+step = "case.step"
+correct_output = "case.expected"
+reasoning = "result.explanation"
+filter_field = "result.status"
+filter_value = "failed"
+metadata_fields = ["result.score"]
+""")
+    source = tmp_project / "evals.jsonl"
+    source.write_text(
+        '{"case":{"input":"alpha","step":"classify","expected":"A"},'
+        '"result":{"actual":"B","explanation":"wrong class",'
+        '"status":"failed","score":0}}\n'
+        '{"case":{"input":"beta","step":"classify","expected":"B"},'
+        '"result":{"actual":"B","explanation":"correct",'
+        '"status":"passed","score":1}}\n'
+    )
+
+    corrections, skipped = import_eval_failures(
+        load_config(tmp_project / "protolab.toml"),
+        source,
+        adapter_name="eval_lab",
+    )
+
+    assert skipped == 0
+    assert len(corrections) == 1
+    assert corrections[0]["protocol_version"] == "v2.0"
+    assert corrections[0]["subject"] == "alpha"
+    assert corrections[0]["protocol_output"] == "B"
+    assert corrections[0]["correct_output"] == "A"
+    assert corrections[0]["reasoning"] == "wrong class"
+    assert corrections[0]["metadata"] == {"score": 0}

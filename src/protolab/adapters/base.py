@@ -13,7 +13,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -91,30 +91,43 @@ def read_file(path: Path) -> list[dict[str, Any]]:
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    with path.open() as f:
-        for line in f:
+    with path.open(encoding="utf-8") as f:
+        for line_number, line in enumerate(f, start=1):
             line = line.strip()
             if line:
-                rows.append(json.loads(line))
+                row = json.loads(line)
+                if not isinstance(row, dict):
+                    raise ValueError(
+                        f"JSONL line {line_number} must be a JSON object."
+                    )
+                rows.append(row)
     return rows
 
 
 def _read_csv(path: Path) -> list[dict[str, Any]]:
-    with path.open(newline="") as f:
+    with path.open(encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         return list(reader)
 
 
 def _read_json(path: Path) -> list[dict[str, Any]]:
-    with path.open() as f:
+    with path.open(encoding="utf-8") as f:
         data = json.load(f)
     if isinstance(data, list):
-        return data
+        return _require_object_rows(data, "JSON array")
     if isinstance(data, dict):
         # Common pattern: results nested under a key
         for key in ("results", "data", "items", "rows"):
             if key in data and isinstance(data[key], list):
-                return data[key]  # type: ignore[no-any-return]
+                return _require_object_rows(data[key], f"JSON '{key}' array")
         # Single object — wrap in list
         return [data]
-    return []
+    raise ValueError("JSON import must contain an object or an array of objects.")
+
+
+def _require_object_rows(values: list[Any], context: str) -> list[dict[str, Any]]:
+    """Reject scalar rows before adapters can mistake failure for emptiness."""
+    for index, value in enumerate(values):
+        if not isinstance(value, dict):
+            raise ValueError(f"{context} row {index} must be a JSON object.")
+    return cast(list[dict[str, Any]], values)

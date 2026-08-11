@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from protolab.adapters.generic import GenericAdapter
 from protolab.config import ImportSchema
 
@@ -116,7 +118,8 @@ def test_missing_required_field_skips(tmp_path):
     f = tmp_path / "data.jsonl"
     f.write_text("\n".join(lines) + "\n")
 
-    stubs = GenericAdapter(_schema()).parse(f)
+    with pytest.warns(UserWarning, match="could not resolve"):
+        stubs = GenericAdapter(_schema()).parse(f)
     assert len(stubs) == 1
 
 
@@ -149,3 +152,19 @@ def test_csv_format(tmp_path):
 
     assert len(stubs) == 1
     assert stubs[0].subject == "hello"
+
+
+def test_schema_format_rejects_wrong_extension(tmp_path, sample_config):
+    """A schema's format declaration constrains the executable import path."""
+    from protolab.import_cmd import import_eval_failures
+
+    f = tmp_path / "data.csv"
+    f.write_text("input,output,category\nhello,world,greet\n")
+    sample_config.import_schemas["json_only"] = _schema(format="json")
+
+    with pytest.raises(ValueError, match="does not accept '.csv'"):
+        import_eval_failures(
+            sample_config,
+            f,
+            adapter_name="json_only",
+        )

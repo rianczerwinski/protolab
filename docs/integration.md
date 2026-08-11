@@ -2,9 +2,7 @@
 
 ## Eval Framework Integration
 
-Protolab imports failure records from eval frameworks as correction stubs.
-A stub has the structural fields populated but `correct_output` and `reasoning`
-set to `TODO` — the human analyst fills these in via `protolab correct`.
+Protolab imports failure records from eval frameworks as correction stubs. A stub has the structural fields populated but `correct_output` and `reasoning` set to `TODO` unless the adapter can recover them from the source.
 
 ### Promptfoo
 
@@ -12,9 +10,7 @@ set to `TODO` — the human analyst fills these in via `protolab correct`.
 protolab import results.json --adapter promptfoo
 ```
 
-Parses Promptfoo JSON output. Extracts subject from `vars`, protocol output
-from `response.output`, expected output from `assertions`, and grading reason.
-Metadata includes score, provider, and token counts.
+Parses Promptfoo JSON output. Extracts the subject from `vars`, protocol output from `response.output`, expected output from assertions, and the grading reason. Metadata includes scores, providers, and token counts.
 
 ### Braintrust
 
@@ -22,37 +18,44 @@ Metadata includes score, provider, and token counts.
 protolab import experiments.jsonl --adapter braintrust
 ```
 
-Parses Braintrust JSONL export. Filters to failures (scores < 1.0). Collects
-scores and source metadata.
+Parses Braintrust JSONL or JSON exports. Filters to failures with a score below 1.0 and retains scores and source metadata.
 
-### Generic (Config-Driven)
+### Config-Driven Adapters
 
-For custom eval frameworks, define an import schema in `protolab.toml`:
+For another eval framework, define a named import schema in `protolab.toml`:
 
 ```toml
 [import.my_framework]
-format = "jsonl"                    # jsonl | csv | json
-subject_field = "input.case_id"     # Dot-path into each record
-output_field = "response.text"
-expected_field = "expected"
-reason_field = "grading.reason"     # Optional
-filter = "result == 'fail'"         # Optional filter expression
+format = "jsonl"
+subject = "input.case_id"
+protocol_output = "response.text"
+step = "grading.category"
+correct_output = "expected"
+reasoning = "grading.reason"
+filter_field = "result"
+filter_value = "fail"
 metadata_fields = ["score", "model", "latency"]
 ```
 
-Then:
+`format` accepts `jsonl`, `csv`, or `json`. Field mappings use dot paths into each source record. `correct_output` and `reasoning` are optional and default to the literal `TODO`; `filter_field` and `filter_value` are optional but must be declared together.
+
+Import with the schema name:
+
 ```bash
 protolab import results.jsonl --adapter my_framework
 ```
 
-### Field Mapping
+The older `--from my_framework` spelling remains an alias for scripted callers.
+
+### Direct Field Mapping
+
+Flat JSONL, CSV, or JSON records need no custom schema. Auto-detection falls back to the legacy field mapper, whose field names can be overridden directly:
 
 ```bash
-# Direct field mapping without config
 protolab import results.jsonl \
   --subject-field=input \
   --output-field=expected \
-  --reason-field=grading_notes
+  --step-field=category
 ```
 
 ## Webhook Ingestion
@@ -60,12 +63,10 @@ protolab import results.jsonl \
 The web server accepts POST requests for automated ingestion:
 
 ```bash
-# Generic ingestion
 curl -X POST http://localhost:8000/api/ingest \
   -H "Content-Type: application/json" \
   -d '[{"subject": "case_1", "step": "classify", "protocol_output": "X", "correct_output": "TODO", "reasoning": "TODO"}]'
 
-# Adapter-based webhook
 curl -X POST http://localhost:8000/api/ingest/promptfoo \
   -H "Content-Type: application/json" \
   -d @promptfoo-results.json
@@ -73,40 +74,26 @@ curl -X POST http://localhost:8000/api/ingest/promptfoo \
 
 ## Git Workflow
 
-Protolab stores everything in plain files (TOML + markdown). Recommended git
-practices:
-
-- **Commit corrections as they accumulate** — they're append-only, merge
-  conflicts are rare
-- **Commit resynthesized protocols as discrete events** — the version bump in
-  `protolab.toml` makes each resynthesis a clear point in history
-- **Archive directory grows monotonically** — old versions are reference
-  material, never modified
+Protolab stores everything in plain TOML and Markdown files. Corrections accumulate append-only, resynthesized protocols should be committed as discrete versioned events, and archived protocol versions remain unchanged as reference material.
 
 ## CI/CD
 
-`protolab check` returns exit code 1 when any trigger is met. Use it in CI
-to flag when resynthesis is overdue:
+`protolab check` returns exit code 1 when any trigger is met, so CI can flag when resynthesis is overdue:
 
 ```yaml
-# GitHub Actions example
 - name: Check protocol freshness
-  run: protolab check --exit-code
+  run: protolab check
 ```
 
 ## Team Usage
 
-Multiple team members can log corrections against the same protocol. Since
-corrections are append-only TOML, concurrent commits produce trivially
-resolvable merge conflicts (just keep both entries).
+Multiple team members can log corrections against the same protocol. Since corrections are append-only TOML records, concurrent changes can retain both entries when merged.
 
-For larger teams, the web server provides a shared dashboard with SSE live
-updates — corrections logged by one team member appear immediately for others.
+For larger teams, the web server provides a shared dashboard with SSE live updates so corrections logged by one team member appear immediately for others.
 
 ## Multi-Protocol Setups
 
-Each protocol gets its own `protolab.toml`. If you manage multiple protocols
-in the same repository, use directory structure:
+Each protocol gets its own `protolab.toml`. When a repository manages multiple protocols, give each one a directory:
 
 ```
 protocols/
@@ -120,25 +107,22 @@ protocols/
     └── corrections.toml
 ```
 
-Run protolab from each directory, or use `--config` to point at a specific
-config file.
+Run Protolab from the directory of the protocol you want to manage.
 
 ## Export
 
 ### Raw Protocol Export
 
 ```bash
-protolab export raw > protocol-with-metadata.md
+protolab export raw --output protocol-with-metadata.md
 ```
 
-Outputs the protocol with a metadata header (version, correction count,
-last resynthesis date).
+Outputs the protocol with a metadata header containing its version and source path.
 
 ### Promptfoo Config Export
 
 ```bash
-protolab export promptfoo > promptfoo-snippet.yaml
+protolab export promptfoo --output promptfoo-snippet.yaml
 ```
 
-Generates a YAML snippet for `promptfooconfig.yaml` that uses the current
-protocol as the system prompt.
+Generates a YAML snippet for `promptfooconfig.yaml` that uses the current protocol as the system prompt.

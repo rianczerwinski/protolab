@@ -89,6 +89,24 @@ def test_read_json_nested_results(tmp_path):
     assert rows[0]["a"] == 1
 
 
+def test_read_jsonl_rejects_scalar_row(tmp_path):
+    """A non-object JSONL row is an import error, not an empty record."""
+    f = tmp_path / "data.jsonl"
+    f.write_text('{"a": 1}\n42\n')
+
+    with pytest.raises(ValueError, match="JSONL line 2 must be a JSON object"):
+        read_file(f)
+
+
+def test_read_json_rejects_scalar_document(tmp_path):
+    """A scalar JSON document cannot masquerade as an empty import."""
+    f = tmp_path / "data.json"
+    f.write_text('"not a record"')
+
+    with pytest.raises(ValueError, match="object or an array of objects"):
+        read_file(f)
+
+
 def test_read_unsupported_format(tmp_path):
     """Unsupported extension raises ValueError."""
     f = tmp_path / "data.xml"

@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Any
+
+from .adapters.base import resolve_path
+from .types import Correction, Rule
 
 
 @dataclass
@@ -13,8 +17,8 @@ class StepCluster:
     step: str
     count: int
     percentage: float
-    corrections: list[dict]
-    rules: list[dict]
+    corrections: list[Correction]
+    rules: list[Rule]
     preventable_count: int
 
 
@@ -29,10 +33,11 @@ class AnalysisResult:
 
 
 def analyze_corrections(
-    corrections: list[dict],
-    rules: list[dict],
+    corrections: list[Correction],
+    rules: list[Rule],
+    group_by: str = "step",
 ) -> AnalysisResult:
-    """Cluster corrections by step, compute diagnostics."""
+    """Cluster corrections by a top-level or dot-path field."""
     total = len(corrections)
 
     if total == 0:
@@ -43,20 +48,19 @@ def analyze_corrections(
             concentration_ratio=0.0,
         )
 
-    # Group corrections by step, skip malformed entries
-    by_step: dict[str, list[dict]] = defaultdict(list)
+    # Skip records that do not carry the requested grouping field. Store-level
+    # validation owns malformed-record diagnostics; analysis remains pure.
+    by_step: dict[str, list[Correction]] = defaultdict(list)
     for corr in corrections:
-        if "step" not in corr:
+        key: Any = resolve_path(corr, group_by)
+        if key is None:
             continue
-        by_step[corr["step"]].append(corr)
+        by_step[str(key)].append(corr)
 
     # Build clusters
     clusters: list[StepCluster] = []
     for step, step_corrections in by_step.items():
-        step_rules = [
-            r for r in rules
-            if r.get("decision_point") == step
-        ]
+        step_rules = [r for r in rules if r.get("decision_point") == step]
 
         # Count preventable: corrections after any matching rule was added
         preventable = 0
@@ -70,14 +74,16 @@ def analyze_corrections(
                     preventable += 1
                     break
 
-        clusters.append(StepCluster(
-            step=step,
-            count=len(step_corrections),
-            percentage=len(step_corrections) / total * 100,
-            corrections=step_corrections,
-            rules=step_rules,
-            preventable_count=preventable,
-        ))
+        clusters.append(
+            StepCluster(
+                step=step,
+                count=len(step_corrections),
+                percentage=len(step_corrections) / total * 100,
+                corrections=step_corrections,
+                rules=step_rules,
+                preventable_count=preventable,
+            )
+        )
 
     # Sort by count descending
     clusters.sort(key=lambda c: c.count, reverse=True)
@@ -86,5 +92,5 @@ def analyze_corrections(
         total_corrections=total,
         unique_steps=len(clusters),
         clusters=clusters,
-        concentration_ratio=clusters[0].count / total,
+        concentration_ratio=clusters[0].count / total if clusters else 0.0,
     )

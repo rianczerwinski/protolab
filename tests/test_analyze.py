@@ -26,23 +26,9 @@ def test_concentration_ratio(sample_corrections, sample_rules):
 
 
 def test_preventable_detection(sample_corrections, sample_rules):
-    """Rule added on day 3, corrections on day 1 and day 5 — preventable_count = 1.
-
-    For the differential step specifically: rule_003 added day 3 (March 23).
-    corr_009 on day 3 (March 23) — rule date <= corr date, so preventable.
-    corr_010 on day 9 (March 29) — rule date <= corr date, so preventable.
-    That's 2 preventable for differential.
-
-    But the test title says "day 1 and day 5 → preventable = 1" generically.
-    Let's verify: for severity_assessment, rule_002 added day 3.
-    corr_006 day 2 — not preventable. corr_007 day 5 — preventable.
-    corr_008 day 7 — preventable. So 2 preventable for severity.
-    """
+    """Only corrections at or after a matching rule are preventable."""
     result = analyze_corrections(sample_corrections, sample_rules)
-    # Check severity_assessment cluster specifically
     severity = next(c for c in result.clusters if c.step == "severity_assessment")
-    # corr_006 (day 2) is before rule (day 3) — not preventable
-    # corr_007 (day 5) and corr_008 (day 7) are after — preventable
     assert severity.preventable_count == 2
 
 
@@ -66,3 +52,33 @@ def test_malformed_correction_skipped():
     assert result.total_corrections == 2  # total counts all
     assert len(result.clusters) == 1
     assert result.clusters[0].step == "a"
+
+
+def test_group_by_nested_metadata():
+    """Dot-path grouping exposes API analysis dimensions beyond step."""
+    corrections = [
+        {"id": "corr_001", "step": "classify", "metadata": {"model": "a"}},
+        {"id": "corr_002", "step": "classify", "metadata": {"model": "b"}},
+        {"id": "corr_003", "step": "classify", "metadata": {"model": "a"}},
+    ]
+
+    result = analyze_corrections(corrections, [], group_by="metadata.model")
+
+    assert [cluster.step for cluster in result.clusters] == ["a", "b"]
+    assert [cluster.count for cluster in result.clusters] == [2, 1]
+    assert result.concentration_ratio == 2 / 3
+
+
+def test_group_by_missing_from_every_record():
+    """An absent grouping dimension produces an empty result, not a crash."""
+    corrections = [
+        {"id": "corr_001", "step": "classify"},
+        {"id": "corr_002", "step": "classify"},
+    ]
+
+    result = analyze_corrections(corrections, [], group_by="metadata.model")
+
+    assert result.total_corrections == 2
+    assert result.unique_steps == 0
+    assert result.clusters == []
+    assert result.concentration_ratio == 0.0

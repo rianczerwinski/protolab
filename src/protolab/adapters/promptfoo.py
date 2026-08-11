@@ -48,18 +48,26 @@ class PromptfooAdapter(BaseAdapter):
     formats = (".json",)
 
     def parse(self, path: Path) -> list[CorrectionStub]:
-        with path.open() as f:
+        with path.open(encoding="utf-8") as f:
             data = json.load(f)
 
         # Results can be at top level or nested under "results"
+        if not isinstance(data, (dict, list)):
+            raise ValueError(
+                "Promptfoo import must contain an object or an array of results."
+            )
         results = data if isinstance(data, list) else data.get("results", [])
         if isinstance(results, dict):
             results = results.get("results", [])
+        if not isinstance(results, list):
+            raise ValueError("Promptfoo 'results' must be an array.")
 
         stubs: list[CorrectionStub] = []
-        for result in results:
+        for index, result in enumerate(results):
             if not isinstance(result, dict):
-                continue
+                raise ValueError(
+                    f"Promptfoo result {index} must be a JSON object."
+                )
 
             # Skip passing tests
             if result.get("success", True):
