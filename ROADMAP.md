@@ -2,13 +2,12 @@
 
 ## v0.1.x — Current
 
-Multi-file protocol support via flat assembly: glob patterns, ordered
-concatenation, section markers. Single-file configs remain unchanged.
+Each project governs one protocol file and its correction, rule, resynthesis, and export lifecycle. Repositories with multiple independent protocols give each protocol its own directory and `protolab.toml`.
 
 Config:
 ```toml
 [protocol]
-paths = ["instructions/*.md", "system-prompt.md"]
+path = "protocol.md"
 ```
 
 ## Future
