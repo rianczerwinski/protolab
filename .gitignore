@@ -24,3 +24,13 @@ corrections/
 templates/
 resynthesis/
 protocol/versions/
+
+/dev/*
+!/dev/README.md
+!/dev/decisions/
+!/dev/decisions/**
+!/dev/state/
+!/dev/state/**
+!/dev/SURFACE.json
+!/dev/SURFACE.md
+!/dev/surface.validation.json

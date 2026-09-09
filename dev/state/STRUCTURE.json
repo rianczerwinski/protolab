@@ -1,0 +1,377 @@
+{
+  "schema_version": 1,
+  "views": {
+    "worktree": {
+      "source": "filesystem"
+    },
+    "published": {
+      "source": "git"
+    }
+  },
+  "tree": {
+    "kind": "directory",
+    "open": false,
+    "entries": {
+      ".gitignore": {
+        "kind": "file"
+      },
+      ".pre-commit-config.yaml": {
+        "kind": "file"
+      },
+      "CHANGELOG.md": {
+        "kind": "file"
+      },
+      "LICENSE": {
+        "kind": "file"
+      },
+      "README.md": {
+        "kind": "file"
+      },
+      "ROADMAP.md": {
+        "kind": "file"
+      },
+      "TRADEMARK.md": {
+        "kind": "file"
+      },
+      "pyproject.toml": {
+        "kind": "file"
+      },
+      ".venv": {
+        "kind": "directory",
+        "open": true,
+        "required": false,
+        "views": [
+          "worktree"
+        ]
+      },
+      "src": {
+        "kind": "directory",
+        "open": false,
+        "entries": {
+          "README.md": {
+            "kind": "file"
+          },
+          "protolab": {
+            "kind": "directory",
+            "open": false,
+            "entries": {
+              "README.md": {
+                "kind": "file"
+              },
+              "__init__.py": {
+                "kind": "file"
+              },
+              "analyze.py": {
+                "kind": "file"
+              },
+              "api.py": {
+                "kind": "file"
+              },
+              "check.py": {
+                "kind": "file"
+              },
+              "cli.py": {
+                "kind": "file"
+              },
+              "config.py": {
+                "kind": "file"
+              },
+              "correct.py": {
+                "kind": "file"
+              },
+              "import_cmd.py": {
+                "kind": "file"
+              },
+              "init_cmd.py": {
+                "kind": "file"
+              },
+              "llm.py": {
+                "kind": "file"
+              },
+              "py.typed": {
+                "kind": "file"
+              },
+              "resynthesis.py": {
+                "kind": "file"
+              },
+              "serve.py": {
+                "kind": "file"
+              },
+              "status.py": {
+                "kind": "file"
+              },
+              "store.py": {
+                "kind": "file"
+              },
+              "types.py": {
+                "kind": "file"
+              },
+              "__pycache__": {
+                "kind": "directory",
+                "open": true,
+                "required": false,
+                "views": [
+                  "worktree"
+                ]
+              },
+              "adapters": {
+                "kind": "directory",
+                "open": false,
+                "entries": {
+                  "README.md": {
+                    "kind": "file"
+                  },
+                  "__init__.py": {
+                    "kind": "file"
+                  },
+                  "base.py": {
+                    "kind": "file"
+                  },
+                  "braintrust.py": {
+                    "kind": "file"
+                  },
+                  "export.py": {
+                    "kind": "file"
+                  },
+                  "generic.py": {
+                    "kind": "file"
+                  },
+                  "promptfoo.py": {
+                    "kind": "file"
+                  },
+                  "__pycache__": {
+                    "kind": "directory",
+                    "open": true,
+                    "required": false,
+                    "views": [
+                      "worktree"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "docs": {
+        "kind": "directory",
+        "open": false,
+        "entries": {
+          "README.md": {
+            "kind": "file"
+          },
+          "concepts.md": {
+            "kind": "file"
+          },
+          "configuration.md": {
+            "kind": "file"
+          },
+          "correction-schema.md": {
+            "kind": "file"
+          },
+          "integration.md": {
+            "kind": "file"
+          },
+          "resynthesis.md": {
+            "kind": "file"
+          }
+        }
+      },
+      "examples": {
+        "kind": "directory",
+        "open": false,
+        "entries": {
+          "README.md": {
+            "kind": "file"
+          },
+          "resynthesis-prompt-template.md": {
+            "kind": "file"
+          },
+          "quickstart": {
+            "kind": "directory",
+            "open": false,
+            "entries": {
+              "README.md": {
+                "kind": "file"
+              },
+              "corrections.toml": {
+                "kind": "file"
+              },
+              "protocol.md": {
+                "kind": "file"
+              },
+              "protolab.toml": {
+                "kind": "file"
+              }
+            }
+          },
+          "full-loop": {
+            "kind": "directory",
+            "open": false,
+            "entries": {
+              "README.md": {
+                "kind": "file"
+              },
+              "corrections.toml": {
+                "kind": "file"
+              },
+              "protocol-v1.md": {
+                "kind": "file"
+              },
+              "protocol-v2.md": {
+                "kind": "file"
+              },
+              "protolab.toml": {
+                "kind": "file"
+              },
+              "resynthesis-prompt.md": {
+                "kind": "file"
+              },
+              "rules.toml": {
+                "kind": "file"
+              }
+            }
+          }
+        }
+      },
+      "tests": {
+        "kind": "directory",
+        "open": false,
+        "entries": {
+          "README.md": {
+            "kind": "file"
+          },
+          "conftest.py": {
+            "kind": "file"
+          },
+          "test_adapters.py": {
+            "kind": "file"
+          },
+          "test_analyze.py": {
+            "kind": "file"
+          },
+          "test_api.py": {
+            "kind": "file"
+          },
+          "test_braintrust.py": {
+            "kind": "file"
+          },
+          "test_check.py": {
+            "kind": "file"
+          },
+          "test_cli.py": {
+            "kind": "file"
+          },
+          "test_config.py": {
+            "kind": "file"
+          },
+          "test_correct.py": {
+            "kind": "file"
+          },
+          "test_export.py": {
+            "kind": "file"
+          },
+          "test_generic_adapter.py": {
+            "kind": "file"
+          },
+          "test_import.py": {
+            "kind": "file"
+          },
+          "test_init_cmd.py": {
+            "kind": "file"
+          },
+          "test_promptfoo.py": {
+            "kind": "file"
+          },
+          "test_resynthesis.py": {
+            "kind": "file"
+          },
+          "test_serve.py": {
+            "kind": "file"
+          },
+          "test_status.py": {
+            "kind": "file"
+          },
+          "test_store.py": {
+            "kind": "file"
+          },
+          "test_webhook.py": {
+            "kind": "file"
+          },
+          "__pycache__": {
+            "kind": "directory",
+            "open": true,
+            "required": false,
+            "views": [
+              "worktree"
+            ]
+          }
+        }
+      },
+      "dev": {
+        "kind": "directory",
+        "open": false,
+        "entries": {
+          "README.md": {
+            "kind": "file"
+          },
+          "state": {
+            "kind": "directory",
+            "open": false,
+            "entries": {
+              "README.md": {
+                "kind": "file"
+              },
+              "STRUCTURE.json": {
+                "kind": "file"
+              },
+              "design": {
+                "kind": "directory",
+                "open": false,
+                "entries": {
+                  "README.md": {
+                    "kind": "file"
+                  },
+                  "architecture.md": {
+                    "kind": "file"
+                  },
+                  "spec.md": {
+                    "kind": "file"
+                  },
+                  "ux-interview-prompt.md": {
+                    "kind": "file"
+                  }
+                }
+              }
+            }
+          },
+          "runtime": {
+            "kind": "directory",
+            "open": true,
+            "required": false,
+            "views": [
+              "worktree"
+            ]
+          },
+          "decisions": {
+            "kind": "directory",
+            "open": true,
+            "required": false
+          },
+          "SURFACE.json": {
+            "kind": "file",
+            "required": false
+          },
+          "SURFACE.md": {
+            "kind": "file",
+            "required": false
+          },
+          "surface.validation.json": {
+            "kind": "file",
+            "required": false
+          }
+        }
+      }
+    }
+  }
+}

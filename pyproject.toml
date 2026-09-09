@@ -50,3 +50,10 @@ packages = ["src/protolab"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+cache_dir = "dev/runtime/pytest-cache"
+
+[tool.ruff]
+cache-dir = "dev/runtime/ruff-cache"
+
+[tool.mypy]
+cache_dir = "dev/runtime/mypy-cache"

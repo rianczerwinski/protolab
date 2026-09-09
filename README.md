@@ -81,6 +81,16 @@ Then fill in the reasoning with `protolab correct`.
 - [Resynthesis](docs/resynthesis.md) — Prompt design and template customization
 - [Integration](docs/integration.md) — Eval frameworks, CI/CD, team workflows
 
+## Repository
+
+- [src/](src/README.md) — the installable Python package and its adapters.
+- [docs/](docs/README.md) — user-facing concepts, configuration, schemas, and integration guidance.
+- [examples/](examples/README.md) — protocol examples and a resynthesis template.
+- [tests/](tests/README.md) — isolated CLI, storage, and integration checks.
+- [dev/](dev/README.md) — structural controls, design inputs, and ignored runtime scratch.
+
+Run `python -m pytest` in an environment with the development dependencies. Run `repo-shape check` to validate both the physical worktree and Git publication view against [the structure contract](dev/state/STRUCTURE.json).
+
 ## License
 
 MIT. See [TRADEMARK.md](TRADEMARK.md) for trademark notice.
